@@ -1,4 +1,4 @@
-[PyInstaller](http://www.pyinstaller.org/) setup for simp_le.
+[PyInstaller](http://www.pyinstaller.org/) setup for `simp_le`.
 
 ```shell
 pip install -r requirements.txt
