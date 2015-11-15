@@ -6,6 +6,7 @@ install_requires = [
     'acme==0.0.0.dev20151114',
     'cryptography',
     'pyOpenSSL',
+    'pytz',
     'requests',
 ]
 
