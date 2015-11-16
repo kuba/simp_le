@@ -22,7 +22,7 @@ For more info see `simp_le --help`.
 
 3. (Sophisticated) "manager" for
    `${webroot?}/.well-known/acme-challenges` only. No challenges other
-   than `http-01`. Existing web-server must be be running already.
+   than `http-01`. Existing web-server must be running already.
 
 4. No magical webserver auto-configuration.
 
