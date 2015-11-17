@@ -1,5 +1,7 @@
 # simp_le
 
+[![Build Status](https://travis-ci.org/kuba/simp_le.svg?branch=master)](https://travis-ci.org/kuba/simp_le)
+
 Simple [Let's Encrypt](https://letsencrypt.org) client.
 
 ```shell
