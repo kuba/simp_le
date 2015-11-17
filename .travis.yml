@@ -1,0 +1,30 @@
+# configuration for https://travis-ci.org
+language: python
+
+# delegate tests to tox; build matrix contains one suite per testenv
+env:
+  - TOXENV=py26
+  - TOXENV=py27
+  - TOXENV=py33
+  - TOXENV=py34
+  - TOXENV=py35
+  - TOXENV=lint
+install: travis_retry pip install tox
+script: tox
+
+# container-based architecture
+sudo: false
+addons:
+  apt:
+    # keep in sync with bootstrap.sh
+    packages:
+      - ca-certificates
+      - gcc
+      - libssl-dev
+      - libffi-dev
+      - python
+      - python-dev
+      - python-virtualenv
+
+notifications:
+  irc: "irc.freenode.org#simp_le"

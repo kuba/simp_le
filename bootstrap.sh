@@ -1,5 +1,6 @@
 #!/bin/sh -xe
 
+# keep in sync with .travis.yml
 bootstrap_deb () {
   apt-get update
 
