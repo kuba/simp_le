@@ -42,7 +42,7 @@ For more info see `simp_le --help`.
    SAN certificate per `simp_le` run.
 
 9. Flexible storage capabilities. Built-in `simp_le -f fullchain.pem
-   -f privkey.pem`, `simp_le -f chain.pem -f cert.pem -d privkey.pem`,
+   -f key.pem`, `simp_le -f chain.pem -f cert.pem -f key.pem`,
    etc. Extensions through `simp_le -f external_pem.sh`.
 
 10. Do not allow specifying output file paths. Users should symlink if
