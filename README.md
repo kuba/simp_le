@@ -48,8 +48,11 @@ For more info see `simp_le --help`.
 10. Do not allow specifying output file paths. Users should symlink if
     necessary!
 
-11. No need to allow arbitrary command when renewal has happened: just
-    compare cert before and after (`sha256sum`, `mtime`, etc.).
+11. No need to allow specifying an arbitrary command when renewal has
+    happened, just check the exit code:
+    - `0` if certificate data was created or updated;
+    - `1` if renewal not necessary;
+    - `2` in case of errors.
 
 12. `--server` (support multiple CAs).
 

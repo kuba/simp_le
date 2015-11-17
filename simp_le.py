@@ -60,6 +60,10 @@ LE_STAGING_URI = 'https://acme-staging.api.letsencrypt.org/directory'
 LE_CERT_VALIDITY = 90 * 24 * 60 * 60
 DEFAULT_VALID_MIN = LE_CERT_VALIDITY / 3
 
+EXIT_RENEWAL = EXIT_TESTS_OK = 0
+EXIT_NO_RENEWAL = 1
+EXIT_ERROR = 2
+
 
 class Error(Exception):
     """simp_le error."""
@@ -681,9 +685,9 @@ def test(args):
         doctest.DocTestSuite(),
         unittest.defaultTestLoader.loadTestsFromName(__name__)
     ))
-    raise SystemExit(not unittest.TextTestRunner(
+    return EXIT_TESTS_OK if unittest.TextTestRunner(
         verbosity=(2 if args.verbose else 1)).run(
-            suite).wasSuccessful())
+            suite).wasSuccessful() else EXIT_ERROR
 
 
 def _plugins_perist_all(ioplugins):
@@ -822,7 +826,7 @@ def _main(cli_args):
     """Run the script, throw exceptions on error."""
     args = create_parser().parse_args(cli_args)
     if args.test:  # --test
-        test(args)
+        return test(args)
     _setup_logging(args.verbose)
     if args.vhosts is None:
         raise Error('You must set at least one -d/--vhost')
@@ -834,18 +838,20 @@ def _main(cli_args):
 
     if _valid_existing_data(args.ioplugins, args.vhosts, args.valid_min):
         logger.info('Certificates already exist and renewal is not '
-                    'necessary, exiting.')
+                    'necessary, exiting with status code %d.', EXIT_NO_RENEWAL)
+        return EXIT_NO_RENEWAL
     else:
         _new_data(args)
+        return EXIT_RENEWAL
 
 
 def main(cli_args=sys.argv[1:]):
     """Run the script, with exceptions caught and logged."""
     try:
-        _main(cli_args)
+        raise SystemExit(_main(cli_args))
     except Error as error:
         logger.error(error)
-        sys.exit(1)
+        raise SystemExit(EXIT_ERROR)
 
 
 if __name__ == '__main__':
