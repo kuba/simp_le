@@ -823,10 +823,10 @@ def _main(cli_args):
     args = create_parser().parse_args(cli_args)
     if args.test:  # --test
         test(args)
-    elif args.vhosts is None:
+    _setup_logging(args.verbose)
+    if args.vhosts is None:
         raise Error('You must set at least one -d/--vhost')
 
-    _setup_logging(args.verbose)
     logger.debug('%r parsed as %r', cli_args, args)
 
     if not _plugins_perist_all(args.ioplugins):
