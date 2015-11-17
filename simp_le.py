@@ -792,7 +792,7 @@ def _new_data(args):
             logger.warning('%s was not succesfully verified by the '
                            'client. CA is likely to fail as well!', name)
         else:
-            logger.info('%s was succesfully verified by the client')
+            logger.info('%s was succesfully verified by the client', name)
 
         client.answer_challenge(challb, response)
 
