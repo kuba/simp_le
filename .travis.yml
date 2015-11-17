@@ -7,8 +7,14 @@ env:
   - TOXENV=py27
   - TOXENV=py33
   - TOXENV=py34
-  - TOXENV=py35
   - TOXENV=lint
+# python3.5 is not pre-installed on Travis,
+# https://github.com/travis-ci/travis-ci/issues/4794#issuecomment-143758799
+matrix:
+  include:
+    - python: 3.5
+      env:
+        - TOXENV=py35
 install: travis_retry pip install tox
 script: tox
 
