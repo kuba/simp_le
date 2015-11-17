@@ -128,18 +128,21 @@ class AccountKey(object):
 
     @classmethod
     def load(cls):
+        """Load account key."""
         logger.debug('Loading account key from %s', cls.PATH)
         with open(cls.PATH) as account_key_file:
             return jose.JWKRSA.json_loads(account_key_file.read())
 
     @classmethod
     def save(cls, jwk):
+        """Save account key."""
         logger.debug('Saving account key at %s', cls.PATH)
         with open(cls.PATH, 'w') as account_key_file:
             account_key_file.write(jwk.json_dumps())
 
     @classmethod
     def get(cls, args):
+        """Load account key. Create and save if does not exist yet."""
         try:
             account_key = cls.load()
         except IOError as error:
@@ -162,6 +165,7 @@ class AccountKey(object):
 
 class AccountKeyTest(TestCase):
     """Tests for AccountKey."""
+    # pylint: disable=missing-docstring
 
     def setUp(self):
         self.root = tempfile.mkdtemp()
@@ -243,7 +247,8 @@ class IOPlugin(object):
 
     @classmethod
     def register(cls, **kwargs):
-        def _reg(plugin_cls):
+        """Register IO plugin."""
+        def _reg(plugin_cls):  # pylint: disable=missing-docstring
             plugin = plugin_cls(**kwargs)
             assert (os.path.sep not in plugin.path and
                     plugin.path not in ('.', '..'))
@@ -253,21 +258,30 @@ class IOPlugin(object):
 
 
 class OpenSSLIOPlugin(IOPlugin):  # pylint: disable=abstract-method
+    """IOPlugin that uses pyOpenSSL.
+
+    Args:
+      typ: One of `OpenSSL.crypto.FILETYPE_*`, used in loading/dumping.
+    """
 
     def __init__(self, typ=OpenSSL.crypto.FILETYPE_PEM, **kwargs):
         self.typ = typ
         super(OpenSSLIOPlugin, self).__init__(**kwargs)
 
     def load_key(self, data):
+        """Load private key."""
         return OpenSSL.crypto.load_privatekey(self.typ, data)
 
     def dump_key(self, data):
+        """Dump private key."""
         return OpenSSL.crypto.dump_privatekey(self.typ, data).strip()
 
     def load_cert(self, data):
+        """Load certificate."""
         return load_cert(self.typ, data)
 
     def dump_cert(self, data):
+        """Dump certificate."""
         # pylint: disable=protected-access
         return OpenSSL.crypto.dump_certificate(self.typ, data._wrapped).strip()
 
@@ -279,12 +293,14 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
     _SEP = b'\n\n'
 
     @property
-    def _popen_path(self):
+    def script(self):
+        """Relative path to script that accepts load|save|peristed protocol."""
         return './' + self.path
 
     def persisted(self):
+        """Call the external script and see which data is persisted."""
         try:
-            output = subprocess.check_output([self._popen_path, 'persisted'])
+            output = subprocess.check_output([self.script, 'persisted'])
         except OSError as error:
             if error.errno != errno.EEXIST:
                 return self.EMPTY_DATA
@@ -296,9 +312,10 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
         )
 
     def load(self):
+        """Call the external script to retrieve persisted data."""
         try:
             output = subprocess.check_output(
-                [self._popen_path, 'load']).split(self._SEP)
+                [self.script, 'load']).split(self._SEP)
         except subprocess.CalledProcessError as error:
             logger.debug(error)
             return self.EMPTY_DATA
@@ -311,6 +328,7 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
         return self.Data(key=key, cert=cert, chain=chain)
 
     def save(self, data):
+        """Call the external script and send data to be persisted to STDIN."""
         persisted = self.persisted()
         output = []
         if persisted.key:
@@ -320,10 +338,8 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
         if persisted.chain:
             output.extend(self.dump_cert(cert_data)
                           for cert_data in data.chain)
-        logger.info('Calling `%s save` and piping data through',
-                    self._popen_path)
-        proc = subprocess.Popen(
-            [self._popen_path, 'save'], stdin=subprocess.PIPE)
+        logger.info('Calling `%s save` and piping data through', self.script)
+        proc = subprocess.Popen([self.script, 'save'], stdin=subprocess.PIPE)
         stdout, stderr = proc.communicate(input=self._SEP.join(output))
         logger.debug(stdout)
         logger.error(stderr)
@@ -336,16 +352,16 @@ class ChainFile(OpenSSLIOPlugin):
 
     _SEP = '\n\n'  # TODO: do all webservers like this?
 
-    def persisted(self):
+    def persisted(self):  # pylint: disable=missing-docstring
         return self.Data(key=False, cert=False, chain=True)
 
-    def load(self):
+    def load(self):  # pylint: disable=missing-docstring
         with open(self.path, 'rb') as chain_file:
             output = chain_file.read().split(self._SEP)
         chain = [self.load_cert(cert_data) for cert_data in output]
         return self.Data(key=None, cert=None, chain=chain)
 
-    def save(self, data):
+    def save(self, data):  # pylint: disable=missing-docstring
         logger.info('Saving %s', self.path)
         output = (self.dump_cert(chain_cert) for chain_cert in data.chain)
         with open(self.path, 'wb') as chain_file:
@@ -357,15 +373,15 @@ class ChainFile(OpenSSLIOPlugin):
 class FullChainFile(ChainFile):
     """Full chain file plugin."""
 
-    def persisted(self):
+    def persisted(self):  # pylint: disable=missing-docstring
         return self.Data(key=False, cert=True, chain=True)
 
-    def load(self):
+    def load(self):  # pylint: disable=missing-docstring
         output = super(FullChainFile, self).load()
         return self.Data(
             key=output.key, cert=output.chain[0], chain=output.chain[1:])
 
-    def save(self, data):
+    def save(self, data):  # pylint: disable=missing-docstring
         # no need to log here, parent already does it
         return super(FullChainFile, self).save(self.Data(
             key=data.key, cert=None, chain=([data.cert] + data.chain)))
@@ -376,15 +392,15 @@ class FullChainFile(ChainFile):
 class KeyFile(OpenSSLIOPlugin):
     """Private key file plugin."""
 
-    def persisted(self):
+    def persisted(self):  # pylint: disable=missing-docstring
         return self.Data(key=True, cert=False, chain=False)
 
-    def load(self):
+    def load(self):  # pylint: disable=missing-docstring
         with open(self.path, 'rb') as key_file:
             key = self.load_key(key_file.read())
         return self.Data(key=key, cert=None, chain=None)
 
-    def save(self, data):
+    def save(self, data):  # pylint: disable=missing-docstring
         logger.info('Saving %s', self.path)
         output = self.dump_key(data.key)
         with open(self.path, 'wb') as key_file:
@@ -396,15 +412,15 @@ class KeyFile(OpenSSLIOPlugin):
 class CertFile(OpenSSLIOPlugin):
     """Certificate file plugin."""
 
-    def persisted(self):
+    def persisted(self):  # pylint: disable=missing-docstring
         return self.Data(key=False, cert=True, chain=False)
 
-    def load(self):
+    def load(self):  # pylint: disable=missing-docstring
         with open(self.path, 'rb') as cert_file:
             output = cert_file.read()
         return self.Data(key=None, cert=self.load_cert(output), chain=None)
 
-    def save(self, data):
+    def save(self, data):  # pylint: disable=missing-docstring
         output = self.dump_cert(data.cert)
         with open(self.path, 'wb') as cert_file:
             cert_file.write(output)
@@ -517,6 +533,15 @@ def create_parser():
 
 
 def supported_challb(authorization):
+    """Find supported challenge body.
+
+    This plugin supports only `http-01`, so CA must offer it as a
+    single-element combo. If this is not the case this function returns
+    `None`.
+
+    Returns:
+      `acme.messages.ChallengeBody` with `http-01` challenge or `None`.
+    """
     for combo in authorization.body.combinations:
         first_challb = authorization.body.challenges[combo[0]]
         if len(combo) == 1 and isinstance(
@@ -526,6 +551,16 @@ def supported_challb(authorization):
 
 
 def _compute_roots(vhosts, default_root):
+    """Compute webroots.
+
+    Args:
+      vhosts: collection of `Vhost` objects.
+      default_root: Default webroot path.
+
+    Returns:
+      Dictionary mapping vhost name to its webroot path. Vhosts without
+      a root will be pre-populated with the `default_root`.
+    """
     roots = {}
     for vhost in vhosts:
         if vhost.root is not None:
@@ -542,6 +577,13 @@ def _compute_roots(vhosts, default_root):
 
 
 def save_validation(root, challb, validation):
+    """Save validation to webroot.
+
+    Args:
+      root: Webroot path.
+      challb: `acme.messages.ChallengeBody` with `http-01` challenge.
+      validation: `http-01` validation
+    """
     try:
         os.makedirs(os.path.join(root, challb.URI_ROOT_PATH))
     except OSError as error:
@@ -559,14 +601,14 @@ def sha256_of_uri_contents(uri, chunk_size=10):
     ...     sha256_of_uri_contents('https://example.com')
     'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
     """
-    h = hashlib.sha256()
+    h = hashlib.sha256()  # pylint: disable=invalid-name
     response = requests.get(uri, stream=True)
     for chunk in response.iter_content(chunk_size):
         h.update(chunk)
     return h.hexdigest()
 
 
-def componentwise_or(a, b):
+def componentwise_or(first, second):
     """Compoentwise OR.
 
     >>> componentwise_or((False, False), (False, False))
@@ -576,10 +618,14 @@ def componentwise_or(a, b):
     >>> componentwise_or((True, False), (False, True))
     (True, True)
     """
-    return tuple(x or y for x, y in zip(a, b))
+    return tuple(x or y for x, y in zip(first, second))
 
 
 def persist_data(args, cert, chain, key):
+    """Persist data on disk.
+
+    Uses all selected plugins to save certificate data to disk.
+    """
     for plugin_name in args.ioplugins:
         IOPlugin.registered[plugin_name].save(
             IOPlugin.Data(key=key, cert=cert, chain=chain))
@@ -600,7 +646,8 @@ def asn1_generalizedtime_to_dt(timestamp):
     >>> asn1_generalizedtime_to_dt('201511150803-1512')
     datetime.datetime(2015, 11, 15, 8, 0, 3, tzinfo=pytz.FixedOffset(-912))
     """
-    dt = datetime.datetime.strptime(timestamp[:12], '%Y%m%d%H%M%S')
+    dt = datetime.datetime.strptime(  # pylint: disable=invalid-name
+        timestamp[:12], '%Y%m%d%H%M%S')
     if timestamp.endswith('Z'):
         tzinfo = pytz.utc
     else:
@@ -639,7 +686,8 @@ def test(args):
             suite).wasSuccessful())
 
 
-def _persisted_plugins_cover_all_compoenents(ioplugins):
+def _plugins_perist_all(ioplugins):
+    """Do plugins cover all components (key/cert/chain)?"""
     persisted = IOPlugin.Data(key=False, cert=False, chain=False)
     for plugin_name in ioplugins:
         persisted = IOPlugin.Data(*componentwise_or(
@@ -648,6 +696,12 @@ def _persisted_plugins_cover_all_compoenents(ioplugins):
 
 
 def _load_existing_data(ioplugins):
+    """Load existing data from disk.
+
+    Returns:
+      `IOPlugin.Data` instance with all components set or
+      `IOPlugin.EMPTY_DATA`.
+    """
     components = tuple(IOPlugin.EMPTY_DATA._asdict())
     existing = IOPlugin.EMPTY_DATA
     for plugin_name in ioplugins:
@@ -673,6 +727,7 @@ def _load_existing_data(ioplugins):
 
 
 def _valid_existing_data(ioplugins, vhosts, valid_min):
+    """Is the existing cert data valid for enough time?"""
     existing = _load_existing_data(ioplugins)
 
     if existing != IOPlugin.EMPTY_DATA:
@@ -749,7 +804,7 @@ def _new_data(args):
 
 
 def _setup_logging(verbose):
-        # set up basic logging
+    """Setup basic logging."""
     level = logging.DEBUG if verbose else logging.INFO
     root_logger = logging.getLogger()
     root_logger.setLevel(level)
@@ -764,6 +819,7 @@ def _setup_logging(verbose):
 
 
 def _main(cli_args):
+    """Run the script, throw exceptions on error."""
     args = create_parser().parse_args(cli_args)
     if args.test:  # --test
         test(args)
@@ -773,7 +829,7 @@ def _main(cli_args):
     _setup_logging(args.verbose)
     logger.debug('%r parsed as %r', cli_args, args)
 
-    if not _persisted_plugins_cover_all_compoenents(args.ioplugins):
+    if not _plugins_perist_all(args.ioplugins):
         raise Error("Selected IO plugins do not cover all components.")
 
     if _valid_existing_data(args.ioplugins, args.vhosts, args.valid_min):
@@ -784,6 +840,7 @@ def _main(cli_args):
 
 
 def main(cli_args=sys.argv[1:]):
+    """Run the script, with exceptions caught and logged."""
     try:
         _main(cli_args)
     except Error as error:
