@@ -789,10 +789,10 @@ def _new_data(args):
         verified = response.simple_verify(
             challb.chall, name, client.key.public_key())
         if not verified:
-            logger.warning('%s was not succesfully verified by the '
+            logger.warning('%s was not successfully verified by the '
                            'client. CA is likely to fail as well!', name)
         else:
-            logger.info('%s was succesfully verified by the client', name)
+            logger.info('%s was successfully verified by the client', name)
 
         client.answer_challenge(challb, response)
 
