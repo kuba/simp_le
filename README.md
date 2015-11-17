@@ -61,6 +61,11 @@ sudo ./bootstrap.sh
 . venv/bin/activate
 ```
 
-## Examples
+## Help
 
-Have a look into `./examples/`.
+Have a look into `./examples/` and
+https://github.com/kuba/simp_le/wiki/Examples.
+
+If you're having problems you can chat with us on [IRC (#simp_le at
+Freenode)](http://webchat.freenode.net?randomnick=1&channels=%23simp_le&prompt=1)
+
