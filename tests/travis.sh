@@ -1,5 +1,8 @@
 #!/bin/sh -xe
 
+SERVER=http://localhost:4000/directory
+PORT=5002
+
 integration_install() {
   ./venv.sh &
 
@@ -20,14 +23,20 @@ integration_install() {
   cd -
 
   mkdir public_html
-  python -m SimpleHTTPServer 5002 &
+  python -m SimpleHTTPServer ${PORT?} &
+
+  while ! curl ${SERVER?} >/dev/null 2>&1; do
+    printf .
+    sleep 5
+  done
+  echo
 }
 
 integration_script() {
   . venv/bin/activate
   pip -V
 
-  simp_le -v --server http://localhost:4000/directory \
+  simp_le -v --server ${SERVER?} \
     -f key.pem -f cert.pem -f fullchain.pem -d le.wtf:public_html
 }
 
