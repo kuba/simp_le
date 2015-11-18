@@ -21,6 +21,8 @@ matrix:
         - rabbitmq
       addons:
         mariadb: '10.0'
+        hosts:
+          - le.wtf
         apt:
           # keep in sync with bootstrap.sh and below
           packages:
