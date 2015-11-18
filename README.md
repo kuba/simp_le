@@ -23,12 +23,12 @@ For more info see `simp_le --help`.
    key/certificate/chain found. Renew only if necessary.
 
 3. (Sophisticated) "manager" for
-   `${webroot?}/.well-known/acme-challenges` only. No challenges other
+   `${webroot?}/.well-known/acme-challenge` only. No challenges other
    than `http-01`. Existing web-server must be running already.
 
 4. No magical webserver auto-configuration.
 
-5. Owner of `${webroot?}/.well-known/acme-challenges` must be able to
+5. Owner of `${webroot?}/.well-known/acme-challenge` must be able to
    run the script, without privilege escalation (`sudo`, `root`,
    etc.).
 
