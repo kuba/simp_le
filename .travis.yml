@@ -24,8 +24,8 @@ matrix:
         hosts:
           - le.wtf
         apt:
-          # keep in sync with bootstrap.sh and below
           packages:
+            # keep in sync with bootstrap.sh and below
             - ca-certificates
             - gcc
             - libssl-dev
@@ -33,6 +33,8 @@ matrix:
             - python
             - python-dev
             - python-virtualenv
+            # Boulder integration test deps
+            - rsyslog
 
 install: tests/travis.sh install
 script: tests/travis.sh script
