@@ -852,6 +852,9 @@ def main(cli_args=sys.argv[1:]):
     except Error as error:
         logger.error(error)
         raise SystemExit(EXIT_ERROR)
+    except messages.Error as error:
+        logger.error('ACME server returned an error: %s', error)
+        raise SystemExit(EXIT_ERROR)
 
 
 if __name__ == '__main__':
