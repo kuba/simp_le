@@ -25,7 +25,9 @@ integration_install() {
   cd -
 
   mkdir public_html
+  cd public_html
   python -m SimpleHTTPServer ${PORT?} &
+  cd -
 
   while ! curl ${SERVER?} >/dev/null 2>&1; do
     printf .
