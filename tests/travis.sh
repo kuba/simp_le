@@ -33,10 +33,18 @@ integration_script() {
 
 case $1 in
   install)
-    [ "$BOULDER_INTEGRATION" = "1" ] && integration_install || pip install tox
+    if [ "$BOULDER_INTEGRATION" = "1" ]; then
+      integration_install
+    else
+      pip install tox
+    fi
     ;;
   script)
     export TOXENV
-    [ "$BOULDER_INTEGRATION" = "1" ] && integration_script || tox
+    if [ "$BOULDER_INTEGRATION" = "1" ]; then
+      integration_script
+    else
+      tox
+    fi
     ;;
 esac
