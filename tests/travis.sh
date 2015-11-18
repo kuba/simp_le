@@ -26,8 +26,9 @@ integration_install() {
 integration_script() {
   . venv/bin/activate
   pip -V
+  alias simp_le_test="simp_le -v --server http://localhost:4000/directory"
 
-  simp_le -f key.pem -f cert.pem -f fullchain.pem -d le.wtf:public_html
+  simp_le_test -f key.pem -f cert.pem -f fullchain.pem -d le.wtf:public_html
 }
 
 case $1 in
