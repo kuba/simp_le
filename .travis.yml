@@ -21,6 +21,16 @@ matrix:
         - rabbitmq
       addons:
         mariadb: '10.0'
+        apt:
+          # keep in sync with bootstrap.sh and below
+          packages:
+            - ca-certificates
+            - gcc
+            - libssl-dev
+            - libffi-dev
+            - python
+            - python-dev
+            - python-virtualenv
 
 install: tests/travis.sh install
 script: tests/travis.sh script
@@ -29,7 +39,7 @@ script: tests/travis.sh script
 sudo: false
 addons:
   apt:
-    # keep in sync with bootstrap.sh
+    # keep in sync with bootstrap.sh and above
     packages:
       - ca-certificates
       - gcc

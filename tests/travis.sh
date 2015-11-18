@@ -11,8 +11,7 @@ integration_script() {
 
 case $1 in
   install)
-    [ "$BOULDER_INTEGRATION" = "1" ] && integration_install || \
-      travis_retry pip install
+    [ "$BOULDER_INTEGRATION" = "1" ] && integration_install || pip install tox
     ;;
   script)
     export TOXENV
