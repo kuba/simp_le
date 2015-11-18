@@ -22,8 +22,8 @@ matrix:
       addons:
         mariadb: '10.0'
 
-install: travis_retry pip install tox
-script: tox
+install: tests/travis.sh install
+script: tests/travis.sh script
 
 # container-based architecture
 sudo: false
