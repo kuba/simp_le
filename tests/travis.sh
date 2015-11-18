@@ -6,6 +6,8 @@ PORT=5002
 integration_install() {
   ./venv.sh &
 
+  cd $GOPATH/src/github.com/letsencrypt/boulder
+
   # `/...` avoids `no buildable Go source files` errors, for more info
   # see `go help packages`
   go get -d github.com/letsencrypt/boulder/... &
@@ -15,10 +17,10 @@ integration_install() {
    chmod +x $GOPATH/bin/goose) &
   # listenbuddy is needed for ./start.py
   go get github.com/jsha/listenbuddy &
+  ./test/create_db.sh &
 
   wait
 
-  cd $GOPATH/src/github.com/letsencrypt/boulder
   ./start.py &
   cd -
 
