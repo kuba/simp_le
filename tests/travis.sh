@@ -24,7 +24,11 @@ integration_install() {
 
   mkdir public_html
   cd public_html
-  python -m SimpleHTTPServer ${PORT?} &
+  if echo ${TOXENV?} | grep -q py3; then
+    python -m http.server ${PORT?} &
+  else
+    python -m SimpleHTTPServer ${PORT?} &
+  fi
   cd -
 
   while ! curl ${SERVER?} >/dev/null 2>&1; do
