@@ -24,7 +24,7 @@ integration_install() {
 
   mkdir public_html
   cd public_html
-  if echo ${TOXENV?} | grep -q py3; then
+  if python -V 2>&1 | grep -q "Python 3."; then
     python -m http.server ${PORT?} &
   else
     python -m SimpleHTTPServer ${PORT?} &
