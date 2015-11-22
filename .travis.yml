@@ -1,50 +1,20 @@
 # configuration for https://travis-ci.org
 language: python
 
-# delegate tests to tox; build matrix contains one suite per testenv
-env:
-  - TOXENV=py26
-  - TOXENV=py27
-  - TOXENV=py33
-  - TOXENV=py34
-  - TOXENV=lint
-matrix:
-  include:
-    # python3.5 is not pre-installed on Travis,
-    # https://github.com/travis-ci/travis-ci/issues/4794#issuecomment-143758799
-    - env: TOXENV=py35
-      python: 3.5
-    - env: BOULDER_INTEGRATION=1
-      language: go
-      go: 1.5.1
-      services:
-        - rabbitmq
-      addons:
-        mariadb: '10.0'
-        hosts:
-          - le.wtf
-        apt:
-          packages:
-            # keep in sync with bootstrap.sh and below
-            - ca-certificates
-            - gcc
-            - libssl-dev
-            - libffi-dev
-            - python
-            - python-dev
-            - python-virtualenv
-            # Boulder integration test deps
-            - rsyslog
-
-install: tests/travis.sh install
-script: tests/travis.sh script
-
 # container-based architecture
 sudo: false
+
+services:
+  # integration tests Boulder needs AMQP
+  - rabbitmq
+
 addons:
+  mariadb: '10.0'
+  hosts:
+    - le.wtf
   apt:
-    # keep in sync with bootstrap.sh and above
     packages:
+      # keep in sync with bootstrap.sh
       - ca-certificates
       - gcc
       - libssl-dev
@@ -52,6 +22,30 @@ addons:
       - python
       - python-dev
       - python-virtualenv
+      # Boulder integration test deps
+      - rsyslog
+
+env:
+  global:
+    - GOPATH=/tmp/go
+    - PATH=$GOPATH/bin:$PATH
+  # delegate tests to tox; build matrix contains one suite per testenv
+  matrix:
+    - TOXENV=py26
+    - TOXENV=py27
+    - TOXENV=py33
+    - TOXENV=py34
+    - TOXENV=lint
+matrix:
+  include:
+    # python3.5 is not pre-installed on Travis,
+    # https://github.com/travis-ci/travis-ci/issues/4794#issuecomment-143758799
+    - env: TOXENV=py35
+      python: 3.5
+
+before_install: . ./tests/travis.sh before_install
+install: . ./tests/travis.sh install
+script: . ./tests/travis.sh script
 
 notifications:
   irc:

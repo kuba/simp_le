@@ -34,6 +34,7 @@ import tempfile
 import time
 import unittest
 
+import six
 from six.moves import zip  # pylint: disable=redefined-builtin
 
 from cryptography.hazmat.backends import default_backend
@@ -354,7 +355,7 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
 class ChainFile(OpenSSLIOPlugin):
     """Certificate chain plugin."""
 
-    _SEP = '\n\n'  # TODO: do all webservers like this?
+    _SEP = b'\n\n'  # TODO: do all webservers like this?
 
     def persisted(self):  # pylint: disable=missing-docstring
         return self.Data(key=False, cert=False, chain=True)
@@ -577,7 +578,7 @@ def _compute_roots(vhosts, default_root):
         roots[vhost.name] = root
 
     empty_roots = dict((name, root)
-                       for name, root in roots.iteritems() if root is None)
+                       for name, root in six.iteritems(roots) if root is None)
     if empty_roots:
         raise ValueError(empty_roots)
     return roots
@@ -599,7 +600,7 @@ def save_validation(root, challb, validation):
     path = os.path.join(root, challb.path[1:])
     with open(path, 'w') as validation_file:
         logger.debug('Saving validation (%r) at %s', validation, path)
-        validation_file.write(validation.encode())
+        validation_file.write(validation)
 
 
 def sha256_of_uri_contents(uri, chunk_size=10):
@@ -786,9 +787,9 @@ def _new_data(args):
         for vhost in args.vhosts
     )
     assert all(supported_challb(auth) is not None
-               for auth in authorizations.itervalues())
+               for auth in six.itervalues(authorizations))
 
-    for name, auth in authorizations.iteritems():
+    for name, auth in six.iteritems(authorizations):
         challb = supported_challb(auth)
         response, validation = challb.response_and_validation(client.key)
         save_validation(roots[name], challb, validation)
@@ -804,7 +805,7 @@ def _new_data(args):
         client.answer_challenge(challb, response)
 
     key = gen_pkey(args.cert_key_size)
-    csr = gen_csr(key, roots)
+    csr = gen_csr(key, [vhost.name.encode() for vhost in args.vhosts])
     certr, _ = client.poll_and_request_issuance(csr, authorizations.values())
     chain = client.fetch_chain(certr)
     persist_data(args, certr.body, chain, key)
