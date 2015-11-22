@@ -597,7 +597,7 @@ def save_validation(root, challb, validation):
     path = os.path.join(root, challb.path[1:])
     with open(path, 'w') as validation_file:
         logger.debug('Saving validation (%r) at %s', validation, path)
-        validation_file.write(validation.encode())
+        validation_file.write(validation)
 
 
 def sha256_of_uri_contents(uri, chunk_size=10):
