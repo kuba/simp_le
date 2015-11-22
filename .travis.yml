@@ -25,13 +25,17 @@ addons:
       # Boulder integration test deps
       - rsyslog
 
-# delegate tests to tox; build matrix contains one suite per testenv
 env:
-  - TOXENV=py26
-  - TOXENV=py27
-  - TOXENV=py33
-  - TOXENV=py34
-  - TOXENV=lint
+  global:
+    - GOPATH=/tmp/go
+    - PATH=$GOPATH/bin:$PATH
+  # delegate tests to tox; build matrix contains one suite per testenv
+  matrix:
+    - TOXENV=py26
+    - TOXENV=py27
+    - TOXENV=py33
+    - TOXENV=py34
+    - TOXENV=lint
 matrix:
   include:
     # python3.5 is not pre-installed on Travis,
