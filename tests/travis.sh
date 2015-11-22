@@ -5,8 +5,6 @@ TOS_SHA256=3ae9d8149e59b8845069552fdae761c3a042fc5ede1fcdf8f37f7aa4707c4d6e
 PORT=5002
 
 integration_install() {
-  ./venv.sh &
-
   # `/...` avoids `no buildable Go source files` errors, for more info
   # see `go help packages`
   go get -d github.com/letsencrypt/boulder/... &
@@ -37,27 +35,34 @@ integration_install() {
 }
 
 integration_script() {
-  . venv/bin/activate
+  . .tox/$TOXENV/bin/activate
   pip -V
 
   simp_le -v --server ${SERVER?} --tos_sha256 ${TOS_SHA256?} \
     -f key.pem -f cert.pem -f fullchain.pem -d le.wtf:public_html
 }
 
+if [ "py${TOXENV#py}" = "${TOXENV}" ]; then
+  BOULDER_INTEGRATION=yes
+fi
+
 case $1 in
+  before_install)
+    if [ "x$BOULDER_INTEGRATION" != "x" ]; then
+      eval "$(gimme 1.5.1)"
+    fi
+  ;;
   install)
-    if [ "$BOULDER_INTEGRATION" = "1" ]; then
+    pip install tox
+    if [ "x$BOULDER_INTEGRATION" != "x" ]; then
       integration_install
-    else
-      pip install tox
     fi
     ;;
   script)
     export TOXENV
-    if [ "$BOULDER_INTEGRATION" = "1" ]; then
+    tox
+    if [ "x$BOULDER_INTEGRATION" != "x" ]; then
       integration_script
-    else
-      tox
     fi
     ;;
 esac
