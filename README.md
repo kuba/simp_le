@@ -56,6 +56,8 @@ For more info see `simp_le --help`.
 
 12. `--server` (support multiple CAs).
 
+13. Support for revocation.
+
 ## Installation
 
 ```shell

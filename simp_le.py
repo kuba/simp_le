@@ -60,7 +60,7 @@ LE_STAGING_URI = 'https://acme-staging.api.letsencrypt.org/directory'
 LE_CERT_VALIDITY = 90 * 24 * 60 * 60
 DEFAULT_VALID_MIN = LE_CERT_VALIDITY / 3
 
-EXIT_RENEWAL = EXIT_TESTS_OK = 0
+EXIT_RENEWAL = EXIT_TESTS_OK = EXIT_REVOKE_OK = 0
 EXIT_NO_RENEWAL = 1
 EXIT_ERROR = 2
 
@@ -455,6 +455,9 @@ def create_parser():
         help='Display version and exit.'
     )
     modes.add_argument(
+        '--revoke', action='store_true', default=False,
+        help='Revoke existing certificate')
+    modes.add_argument(
         '--test', action='store_true', default=False,
         help='Run tests and exit.',
     )
@@ -725,15 +728,14 @@ def _load_existing_data(ioplugins):
                 elif getattr(data, component) is not None:
                     assert existing_data == getattr(data, component)
 
-    # All or nothing!
-    assert existing == IOPlugin.EMPTY_DATA or all(
-        getattr(existing, component) is not None for component in components)
     return existing
 
 
 def _valid_existing_data(ioplugins, vhosts, valid_min):
     """Is the existing cert data valid for enough time?"""
     existing = _load_existing_data(ioplugins)
+    # All or nothing!
+    assert existing == IOPlugin.EMPTY_DATA or None not in existing
 
     if existing != IOPlugin.EMPTY_DATA:
         # pylint: disable=protected-access
@@ -808,6 +810,19 @@ def _new_data(args):
     persist_data(args, certr.body, chain, key)
 
 
+def revoke(args):
+    """Revoke certificate."""
+    existing = _load_existing_data(args.ioplugins)
+    if existing.cert is None:
+        raise Error('No existing certificate')
+
+    key = AccountKey.get(args)
+    net = acme_client.ClientNetwork(key, user_agent=args.user_agent)
+    client = acme_client.Client(directory=args.server, key=key, net=net)
+    client.revoke(existing.cert)
+    return EXIT_REVOKE_OK
+
+
 def _setup_logging(verbose):
     """Setup basic logging."""
     level = logging.DEBUG if verbose else logging.INFO
@@ -826,14 +841,18 @@ def _setup_logging(verbose):
 def _main(cli_args):
     """Run the script, throw exceptions on error."""
     args = create_parser().parse_args(cli_args)
+
     if args.test:  # --test
         return test(args)
-    _setup_logging(args.verbose)
-    if args.vhosts is None:
-        raise Error('You must set at least one -d/--vhost')
 
+    _setup_logging(args.verbose)
     logger.debug('%r parsed as %r', cli_args, args)
 
+    if args.revoke:  # --revoke
+        return revoke(args)
+
+    if args.vhosts is None:
+        raise Error('You must set at least one -d/--vhost')
     if not _plugins_perist_all(args.ioplugins):
         raise Error("Selected IO plugins do not cover all components.")
 
