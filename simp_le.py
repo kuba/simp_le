@@ -785,7 +785,7 @@ def _new_data(args):
         for vhost in args.vhosts
     )
     assert all(supported_challb(auth) is not None
-               for auth in authorizations.itervalues())
+               for auth in six.itervalues(authorizations))
 
     for name, auth in six.iteritems(authorizations):
         challb = supported_challb(auth)
