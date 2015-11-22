@@ -45,7 +45,7 @@ integration_script() {
   simp_le -v --server ${SERVER?} --tos_sha256 ${TOS_SHA256?} \
     -f key.pem -f cert.pem -f fullchain.pem -d le.wtf:public_html
 
-  simp_le -v --revoke -f cert.pem
+  simp_le -v --server ${SERVER?} --revoke -f cert.pem
 }
 
 if [ "py${TOXENV#py}" = "${TOXENV}" ]; then
