@@ -279,7 +279,7 @@ class OpenSSLIOPlugin(IOPlugin):  # pylint: disable=abstract-method
 
     def dump_key(self, data):
         """Dump private key."""
-        return OpenSSL.crypto.dump_privatekey(self.typ, data).strip()
+        return OpenSSL.crypto.dump_privatekey(self.typ, data).strip().decode()
 
     def load_cert(self, data):
         """Load certificate."""
@@ -288,7 +288,8 @@ class OpenSSLIOPlugin(IOPlugin):  # pylint: disable=abstract-method
     def dump_cert(self, data):
         """Dump certificate."""
         # pylint: disable=protected-access
-        return OpenSSL.crypto.dump_certificate(self.typ, data._wrapped).strip()
+        return OpenSSL.crypto.dump_certificate(
+            self.typ, data._wrapped).strip().decode()
 
 
 @IOPlugin.register(path='external_pem.sh', typ=OpenSSL.crypto.FILETYPE_PEM)
