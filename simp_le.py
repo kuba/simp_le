@@ -34,6 +34,7 @@ import tempfile
 import time
 import unittest
 
+import six
 from six.moves import zip  # pylint: disable=redefined-builtin
 
 from cryptography.hazmat.backends import default_backend
@@ -574,7 +575,7 @@ def _compute_roots(vhosts, default_root):
         roots[vhost.name] = root
 
     empty_roots = dict((name, root)
-                       for name, root in roots.iteritems() if root is None)
+                       for name, root in six.iteritems(roots) if root is None)
     if empty_roots:
         raise ValueError(empty_roots)
     return roots
@@ -786,7 +787,7 @@ def _new_data(args):
     assert all(supported_challb(auth) is not None
                for auth in authorizations.itervalues())
 
-    for name, auth in authorizations.iteritems():
+    for name, auth in six.iteritems(authorizations):
         challb = supported_challb(auth)
         response, validation = challb.response_and_validation(client.key)
         save_validation(roots[name], challb, validation)
