@@ -355,7 +355,7 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
 class ChainFile(OpenSSLIOPlugin):
     """Certificate chain plugin."""
 
-    _SEP = '\n\n'  # TODO: do all webservers like this?
+    _SEP = b'\n\n'  # TODO: do all webservers like this?
 
     def persisted(self):  # pylint: disable=missing-docstring
         return self.Data(key=False, cert=False, chain=True)
