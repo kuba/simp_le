@@ -803,7 +803,7 @@ def _new_data(args):
         client.answer_challenge(challb, response)
 
     key = gen_pkey(args.cert_key_size)
-    csr = gen_csr(key, roots)
+    csr = gen_csr(key, [vhost.name.encode() for vhost in args.vhosts])
     certr, _ = client.poll_and_request_issuance(csr, authorizations.values())
     chain = client.fetch_chain(certr)
     persist_data(args, certr.body, chain, key)
