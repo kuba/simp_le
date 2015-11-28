@@ -832,7 +832,7 @@ def _setup_logging(verbose):
     handler = logging.StreamHandler()
     handler.setLevel(level)
     formatter = logging.Formatter(
-        fmt='%(asctime)s:%(levelname)s:%(name)s: %(message)s',
+        fmt='%(asctime)s:%(levelname)s:%(name)s:%(lineno)d: %(message)s',
     )
     formatter.converter = time.gmtime  # UTC instead of localtime
     handler.setFormatter(formatter)
