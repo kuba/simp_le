@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 VERSION = '0'
 URL = 'https://github.com/kuba/simp_le'
 
-LE_STAGING_URI = 'https://acme-staging.api.letsencrypt.org/directory'
+LE_STAGING_URI = 'https://acme-v01.api.letsencrypt.org/directory'
 # https://letsencrypt.org/2015/11/09/why-90-days.html
 LE_CERT_VALIDITY = 90 * 24 * 60 * 60
 DEFAULT_VALID_MIN = LE_CERT_VALIDITY / 3
