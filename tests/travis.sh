@@ -19,6 +19,7 @@ integration_install() {
 
   cd $GOPATH/src/github.com/letsencrypt/boulder
   ./test/create_db.sh
+  go run cmd/rabbitmq-setup/main.go -server amqp://localhost
   ./start.py &
   cd -
 
