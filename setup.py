@@ -3,7 +3,7 @@ import setuptools
 
 
 install_requires = [
-    'acme==0.0.0.dev20151123',
+    'acme==0.1.0',
     'cryptography',
     'pyOpenSSL',
     'pytz',
