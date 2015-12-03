@@ -56,7 +56,7 @@ logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 VERSION = '0'
 URL = 'https://github.com/kuba/simp_le'
 
-LE_STAGING_URI = 'https://acme-v01.api.letsencrypt.org/directory'
+LE_PRODUCTION_URI = 'https://acme-v01.api.letsencrypt.org/directory'
 # https://letsencrypt.org/2015/11/09/why-90-days.html
 LE_CERT_VALIDITY = 90 * 24 * 60 * 60
 DEFAULT_VALID_MIN = LE_CERT_VALIDITY / 3
@@ -533,7 +533,7 @@ def create_parser():
         '--user_agent "" if you want to protect your privacy.',
     )
     http.add_argument(
-        '--server', metavar='URI', default=LE_STAGING_URI,
+        '--server', metavar='URI', default=LE_PRODUCTION_URI,
         help='Directory URI for the CA ACME API endpoint.',
     )
 
