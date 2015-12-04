@@ -806,7 +806,10 @@ def _new_data(args):
 
     key = gen_pkey(args.cert_key_size)
     csr = gen_csr(key, [vhost.name.encode() for vhost in args.vhosts])
-    certr, _ = client.poll_and_request_issuance(csr, authorizations.values())
+    certr, _ = client.poll_and_request_issuance(
+        csr, authorizations.values(),
+        # https://github.com/letsencrypt/letsencrypt/issues/1719
+        max_attempts=(10 * len(authorizations)))
     persist_data(args, certr.body, client.fetch_chain(certr), key)
 
 
