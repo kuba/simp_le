@@ -471,7 +471,7 @@ def create_parser():
         '`-d example.com:/var/www/other_html` syntax.',
     )
     manager.add_argument(
-        '-d', dest='vhosts', action='append',
+        '-d', '--vhost', dest='vhosts', action='append',
         help='Domain name that will be included in the certificate. '
         'Must be specified at least once.', metavar='DOMAIN:PATH',
         type=Vhost.decode,
