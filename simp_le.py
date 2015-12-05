@@ -669,7 +669,9 @@ def _compute_roots(vhosts, default_root):
     empty_roots = dict((name, root)
                        for name, root in six.iteritems(roots) if root is None)
     if empty_roots:
-        raise ValueError(empty_roots)
+        raise Error('Root for the following host(s) were not specified: %s. '
+                    'Try --default_root or use -d example.com:/var/www/html '
+                    'syntax' % ', '.join(empty_roots))
     return roots
 
 
