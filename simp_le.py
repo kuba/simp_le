@@ -394,7 +394,7 @@ class FullChainFile(ChainFile):
 @IOPlugin.register(path='full.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='full.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
 class FullFile(OpenSSLIOPlugin):
-    """Certificate and privatekey and chain lugin."""
+    """Privatekey, certificate and chain plugin."""
 
     _SEP = b'\n\n'  # TODO: do all webservers like this?
 
