@@ -196,7 +196,7 @@ class AccountKeyTest(TestCase):
 
 class Vhost(collections.namedtuple('Vhost', 'name root')):
     """Vhost: domain name and public html root."""
-    _SEPARATOR = ':'
+    _SEP = ':'
 
     @classmethod
     def decode(cls, data):
@@ -211,7 +211,7 @@ class Vhost(collections.namedtuple('Vhost', 'name root')):
         """
         if isinstance(data, cls):
             return data
-        parts = data.split(cls._SEPARATOR, 1)
+        parts = data.split(cls._SEP, 1)
         parts.append(None)
         return cls(name=parts[0], root=parts[1])
 
