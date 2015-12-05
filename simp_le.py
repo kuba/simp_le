@@ -295,14 +295,33 @@ class OpenSSLIOPlugin(IOPlugin):  # pylint: disable=abstract-method
 
 @IOPlugin.register(path='external_pem.sh', typ=OpenSSL.crypto.FILETYPE_PEM)
 class ExternalIOPlugin(OpenSSLIOPlugin):
-    """External IO Plugin."""
+    """External IO Plugin.
+
+    This plugin executes script that complies with the
+    "persisted|load|save protocol":
+
+    - whenever the script is called with `persisted` as the first
+      argument, it should send to STDOUT a subset of three keywords:
+      `key`, `cart`, `chain` (in any order, using any separation
+      character);
+
+    - whenever the script is called with `load` as the first argument
+      it shall write to STDOUT all persisted data as PEM encoded strings
+      separated by double newline characters (`\n\n`) in the following
+      order: key, certificate, certificates in the chain (from leaf to
+      root, also separated using `\n\n`). If some data is not persisted,
+      it must be skipped in the output;
+
+    - whenever the script is called with `save` as the first argument,
+      it should accept data from STDIN and persist it. Data is encoded
+      and ordered in the same way as in the `load` case.
+    """
 
     _SEP = b'\n\n'
 
     @property
     def script(self):
-        """Relative path to script that accepts load|save|persisted protocol.
-        """
+        """Relative path to the script."""
         return './' + self.path
 
     def persisted(self):
