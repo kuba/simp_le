@@ -217,10 +217,28 @@ class Vhost(collections.namedtuple('Vhost', 'name root')):
 
 
 class IOPlugin(object):
-    """Input/output plugin."""
+    """Input/output plugin.
+
+    In case of any problems, `persisted`, `load` and `save`
+    methods should raise `Error`, for which message will be
+    displayed directly to the user through STDERR (in `main`).
+
+    """
     __metaclass__ = abc.ABCMeta
 
     Data = collections.namedtuple('IOPluginData', 'key cert chain')
+    """Plugin data.
+
+    Unless otherwise stated, plugin data compoenents are typically
+    filled with the following data:
+
+    - for `key`: private key, an instance of `OpenSSL.crypto.PKey`
+    - for `cert`: corresponging certificate, an instance of
+      `OpenSSL.crypto.X509`
+    - for `chain`: certificate chain, a list of
+      `OpenSSL.crypto.X509` instances
+    """
+
     EMPTY_DATA = Data(key=None, cert=None, chain=None)
 
     def __init__(self, path, **dummy_kwargs):
@@ -228,15 +246,26 @@ class IOPlugin(object):
 
     @abc.abstractmethod
     def persisted(self):
-        """Which data is persisted by this plugin?"""
+        """Which data is persisted by this plugin?
+
+        This method must be overriden in subclasses and must return
+        `IOPlugin.Data` with boolean values indicating whether specific
+        component is persisted by the plugin.
+        """
         raise NotImplementedError()
 
     @abc.abstractmethod
     def load(self):
         """Load persisted data.
 
-        Returns:
-          IOPlugin.Data
+        This method must be overriden in subclasses and must return
+        `IOPlugin.Data`. For all non-persisted data it must set the
+        corresponding component to `None`. If the data was not persisted
+        previously, it must return `EMPTY_DATA` (note that it does not
+        make sense for the plugin to set subset of the persisted
+        components to not-None: this would mean that data was persisted
+        only partially - if possible plugin should detect such condition
+        and throw an `Error`).
         """
         raise NotImplementedError()
 
@@ -244,8 +273,10 @@ class IOPlugin(object):
     def save(self, data):
         """Save data to file system.
 
-        Args:
-          data: IOPlugin.Data
+        This method must be overriden in subclasses and must accept
+        `IOPlugin.Data`. It must store all persisted components and
+        ignore all non-persisted compoenents. It is guaranted that all
+        persisted compoents are not `None`.
         """
         raise NotImplementedError()
 
@@ -324,14 +355,18 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
         """Relative path to the script."""
         return './' + self.path
 
+    def get_output_or_fail(self, command):
+        """Get output or throw an exception in case of errors."""
+        try:
+            return subprocess.check_output([self.script, command])
+        except (OSError, subprocess.CalledProcessError) as error:
+            logger.exception(error)
+            raise Error(
+                'There was a problem executing external IO plugin script')
+
     def persisted(self):
         """Call the external script and see which data is persisted."""
-        try:
-            output = subprocess.check_output([self.script, 'persisted'])
-        except OSError as error:
-            if error.errno != errno.EEXIST:
-                return self.EMPTY_DATA
-            raise
+        output = self.get_output_or_fail('persisted')
         return self.Data(
             key=('key' in output),
             cert=('cert' in output),
@@ -340,12 +375,7 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
 
     def load(self):
         """Call the external script to retrieve persisted data."""
-        try:
-            output = subprocess.check_output(
-                [self.script, 'load']).split(self._SEP)
-        except subprocess.CalledProcessError as error:
-            logger.debug(error)
-            return self.EMPTY_DATA
+        output = self.get_output_or_fail('load').split(self._SEP)
         # Do NOT log `output` as it contains key material
         persisted = self.persisted()
         key = self.load_key(output.pop(0)) if persisted.key else None
@@ -365,16 +395,63 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
         if persisted.chain:
             output.extend(self.dump_cert(cert_data)
                           for cert_data in data.chain)
+
         logger.info('Calling `%s save` and piping data through', self.script)
-        proc = subprocess.Popen([self.script, 'save'], stdin=subprocess.PIPE)
-        stdout, stderr = proc.communicate(input=self._SEP.join(output))
+        try:
+            proc = subprocess.Popen(
+                [self.script, 'save'], stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE)
+        except OSError as error:
+            logger.exception(error)
+            raise Error(
+                'There was a problem executing external IO plugin script')
+        stdout, stderr = proc.communicate(self._SEP.join(output))
         logger.debug(stdout)
         logger.error(stderr)
+        if not proc.wait():
+            raise Error('External script exited with non-zero code: %d',
+                        proc.returncode)
+
+
+class OpenSSLFileIOPlugin(OpenSSLIOPlugin):
+    """Plugin that save/read files on disk and uses pyOpenSSL."""
+
+    def load(self):
+        try:
+            with open(self.path, 'rb') as persist_file:
+                content = persist_file.read()
+        except IOError as error:
+            if error.errno == errno.ENOENT:
+                # file does not exist, so it was not persisted
+                # previously
+                return self.EMPTY_DATA
+            raise
+        return self.load_from_content(content)
+
+    @abc.abstractmethod
+    def load_from_content(self, content):
+        """Load from file contents.
+
+        This method must be overriden in subclasses. It will be called
+        with the contents of the file read from `path` and should return
+        whatever `IOPlugin.load` is meant to return.
+        """
+        raise NotImplementedError()
+
+    def save_to_file(self, data):
+        """Save data to file."""
+        logger.info('Saving %s', self.path)
+        try:
+            with open(self.path, 'wb') as persist_file:
+                persist_file.write(data)
+        except OSError as error:
+            logging.exception(error)
+            raise Error('Error when saving %s', self.path)
 
 
 @IOPlugin.register(path='chain.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='chain.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
-class ChainFile(OpenSSLIOPlugin):
+class ChainFile(OpenSSLFileIOPlugin):
     """Certificate chain plugin."""
 
     _SEP = b'\n\n'  # TODO: do all webservers like this?
@@ -382,17 +459,14 @@ class ChainFile(OpenSSLIOPlugin):
     def persisted(self):  # pylint: disable=missing-docstring
         return self.Data(key=False, cert=False, chain=True)
 
-    def load(self):  # pylint: disable=missing-docstring
-        with open(self.path, 'rb') as chain_file:
-            output = chain_file.read().split(self._SEP)
-        chain = [self.load_cert(cert_data) for cert_data in output]
+    def load_from_content(self, output):  # pylint: disable=missing-docstring
+        chain = [self.load_cert(cert_data)
+                 for cert_data in output.split(self._SEP)]
         return self.Data(key=None, cert=None, chain=chain)
 
     def save(self, data):  # pylint: disable=missing-docstring
-        logger.info('Saving %s', self.path)
-        output = (self.dump_cert(chain_cert) for chain_cert in data.chain)
-        with open(self.path, 'wb') as chain_file:
-            chain_file.write(self._SEP.join(output))
+        return self.save_to_file(self._SEP.join(
+            self.dump_cert(chain_cert) for chain_cert in data.chain))
 
 
 @IOPlugin.register(path='fullchain.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
@@ -404,53 +478,46 @@ class FullChainFile(ChainFile):
         return self.Data(key=False, cert=True, chain=True)
 
     def load(self):  # pylint: disable=missing-docstring
-        output = super(FullChainFile, self).load()
-        return self.Data(
-            key=output.key, cert=output.chain[0], chain=output.chain[1:])
+        data = super(FullChainFile, self).load()
+        if data.chain is None:
+            cert, chain = None, None
+        else:
+            cert, chain = data.chain[0], data.chain[1:]
+        return self.Data(key=data.key, cert=cert, chain=chain)
 
     def save(self, data):  # pylint: disable=missing-docstring
-        # no need to log here, parent already does it
         return super(FullChainFile, self).save(self.Data(
             key=data.key, cert=None, chain=([data.cert] + data.chain)))
 
 
 @IOPlugin.register(path='key.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='key.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
-class KeyFile(OpenSSLIOPlugin):
+class KeyFile(OpenSSLFileIOPlugin):
     """Private key file plugin."""
 
     def persisted(self):  # pylint: disable=missing-docstring
         return self.Data(key=True, cert=False, chain=False)
 
-    def load(self):  # pylint: disable=missing-docstring
-        with open(self.path, 'rb') as key_file:
-            key = self.load_key(key_file.read())
-        return self.Data(key=key, cert=None, chain=None)
+    def load_from_content(self, output):
+        return self.Data(key=self.load_key(output), cert=None, chain=None)
 
     def save(self, data):  # pylint: disable=missing-docstring
-        logger.info('Saving %s', self.path)
-        output = self.dump_key(data.key)
-        with open(self.path, 'wb') as key_file:
-            key_file.write(output)
+        return self.save_to_file(self.dump_key(data.key))
 
 
 @IOPlugin.register(path='cert.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='cert.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
-class CertFile(OpenSSLIOPlugin):
+class CertFile(OpenSSLFileIOPlugin):
     """Certificate file plugin."""
 
     def persisted(self):  # pylint: disable=missing-docstring
         return self.Data(key=False, cert=True, chain=False)
 
-    def load(self):  # pylint: disable=missing-docstring
-        with open(self.path, 'rb') as cert_file:
-            output = cert_file.read()
+    def load_from_content(self, output):  # pylint: disable=missing-docstring
         return self.Data(key=None, cert=self.load_cert(output), chain=None)
 
     def save(self, data):  # pylint: disable=missing-docstring
-        output = self.dump_cert(data.cert)
-        with open(self.path, 'wb') as cert_file:
-            cert_file.write(output)
+        return self.save_to_file(self.dump_cert(data.cert))
 
 
 def create_parser():
@@ -617,7 +684,8 @@ def save_validation(root, challb, validation):
     try:
         os.makedirs(os.path.join(root, challb.URI_ROOT_PATH))
     except OSError as error:
-        if not error.errno == errno.EEXIST:
+        if error.errno != errno.EEXIST:
+            # directory doesn't already exist and we cannot create it
             raise
     path = os.path.join(root, challb.path[1:])
     with open(path, 'w') as validation_file:
@@ -730,28 +798,30 @@ def _load_existing_data(ioplugins):
     """Load existing data from disk.
 
     Returns:
-      `IOPlugin.Data` instance with all components set or
-      `IOPlugin.EMPTY_DATA`.
+      `IOPlugin.Data` with all plugin data merged and sanity checked
+      for coherence.
     """
-    components = tuple(IOPlugin.EMPTY_DATA._asdict())
-    existing = IOPlugin.EMPTY_DATA
-    for plugin_name in ioplugins:
-        try:
-            data = IOPlugin.registered[plugin_name].load()
-        except IOError as error:
-            if not error.errno != errno.EEXIST:
-                raise
-        else:
-            for component in components:
-                existing_data = getattr(existing, component)
-                if existing_data is None:
-                    new_data = existing._asdict()
-                    new_data[component] = getattr(data, component)
-                    existing = IOPlugin.Data(**new_data)
-                elif getattr(data, component) is not None:
-                    assert existing_data == getattr(data, component)
+    all_existing = IOPlugin.EMPTY_DATA
 
-    return existing
+    for plugin_name in ioplugins:
+        all_persisted = IOPlugin.registered[plugin_name].persisted()
+        all_data = IOPlugin.registered[plugin_name].load()
+
+        new_components = []
+        for persisted, data, existing in zip(
+                all_persisted, all_data, all_existing):
+            if not persisted:
+                new_components.append(existing)
+            # otherwise plugin is persisting this component, so either:
+            # - all other plugins didn't yet save any data (None)
+            # - all plugins saved the same data (not None)
+            elif existing is not None and existing != data:
+                raise Error('Some plugins returned conflicting data')
+            else:
+                new_components.append(data)
+        all_existing = IOPlugin.Data(*new_components)
+
+    return all_existing
 
 
 def _valid_existing_data(ioplugins, vhosts, valid_min):
