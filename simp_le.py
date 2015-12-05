@@ -53,6 +53,9 @@ from acme import jose
 from acme import messages
 
 
+# pylint: disable=too-many-lines
+
+
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 VERSION = '0'
