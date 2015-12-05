@@ -196,7 +196,7 @@ class AccountKeyTest(TestCase):
 
 class Vhost(collections.namedtuple('Vhost', 'name root')):
     """Vhost: domain name and public html root."""
-    _SEPRATOR = ':'
+    _SEPARATOR = ':'
 
     @classmethod
     def decode(cls, data):
@@ -211,7 +211,7 @@ class Vhost(collections.namedtuple('Vhost', 'name root')):
         """
         if isinstance(data, cls):
             return data
-        parts = data.split(cls._SEPRATOR, 1)
+        parts = data.split(cls._SEPARATOR, 1)
         parts.append(None)
         return cls(name=parts[0], root=parts[1])
 
@@ -301,7 +301,8 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
 
     @property
     def script(self):
-        """Relative path to script that accepts load|save|peristed protocol."""
+        """Relative path to script that accepts load|save|persisted protocol.
+        """
         return './' + self.path
 
     def persisted(self):
@@ -620,7 +621,7 @@ def sha256_of_uri_contents(uri, chunk_size=10):
 
 
 def componentwise_or(first, second):
-    """Compoentwise OR.
+    """Componentwise OR.
 
     >>> componentwise_or((False, False), (False, False))
     (False, False)
@@ -697,7 +698,7 @@ def test(args):
             suite).wasSuccessful() else EXIT_ERROR
 
 
-def _plugins_perist_all(ioplugins):
+def _plugins_persist_all(ioplugins):
     """Do plugins cover all components (key/cert/chain)?"""
     persisted = IOPlugin.Data(key=False, cert=False, chain=False)
     for plugin_name in ioplugins:
@@ -858,7 +859,7 @@ def _main(cli_args):
 
     if args.vhosts is None:
         raise Error('You must set at least one -d/--vhost')
-    if not _plugins_perist_all(args.ioplugins):
+    if not _plugins_persist_all(args.ioplugins):
         raise Error("Selected IO plugins do not cover all components.")
 
     if _valid_existing_data(args.ioplugins, args.vhosts, args.valid_min):
