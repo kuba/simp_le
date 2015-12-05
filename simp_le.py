@@ -979,7 +979,7 @@ def main(cli_args=sys.argv[1:]):
         raise SystemExit(EXIT_ERROR)
 
 
-class MainIntegrationTests(unittest.TestCase):
+class MainIntegrationTests(TestCase):
     """Integration tests for main()."""
 
     # this is unittest suite | pylint: disable=missing-docstring
