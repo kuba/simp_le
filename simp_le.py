@@ -27,11 +27,13 @@ import hashlib
 import errno
 import logging
 import os
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
+import traceback
 import unittest
 
 import six
@@ -869,15 +871,58 @@ def _main(cli_args):
 
 
 def main(cli_args=sys.argv[1:]):
-    """Run the script, with exceptions caught and logged."""
+    """Run the script, with exceptions caught and printed to STDERR."""
+    # logging (handler) is not set up yet, use STDERR only!
     try:
         raise SystemExit(_main(cli_args))
     except Error as error:
-        logger.error(error)
+        sys.stderr.write('%s\n' % error)
         raise SystemExit(EXIT_ERROR)
     except messages.Error as error:
-        logger.error('ACME server returned an error: %s', error)
+        sys.stderr.write('ACME server returned an error: %s\n' % error)
         raise SystemExit(EXIT_ERROR)
+    except Exception as error:
+        # maintain manifest invariant: `exit 1` iff renewal not
+        # necessary, `exit 2` iff error
+        sys.stderr.write('Unhandled error has happened:\n')
+        traceback.print_exc(file=sys.stderr)
+        raise SystemExit(EXIT_ERROR)
+
+
+class MainIntegrationTests(unittest.TestCase):
+    """Integration tests for main()."""
+
+    # this is unittest suite | pylint: disable=missing-docstring
+
+    @mock.patch('sys.stderr')
+    def test_error_exit_codes(self, dummy_stderr):
+        test_args = [
+            '',  # no args - no good
+            '--bar',  # unrecognized
+            '-f key.pem -f fullchain.pem',  # no vhosts
+            '-f key.pem -f fullchain.pem -d example.com',  # no root
+            '-f key.pem -f fullchain.pem -d example.com:public_html'
+            ' -d www.example.com',  # no root with multiple domains
+        ]
+        # missing plugin coverage
+        test_args.extend(['-d example.com:public_html %s' % rest for rest in [
+            '',
+            '-f key.pem',
+            '-f key.pem -f cert.pem',
+            '-f key.pem -f chain.pem',
+            '-f fullchain.pem',
+            '-f cert.pem -f fullchain.pem',
+        ]])
+
+        for args in test_args:
+            try:
+                main(shlex.split(args))
+            except SystemExit as error:
+                self.assertEqual(EXIT_ERROR, error.code)
+            else:
+                # assertRaises in 2.6 is not context manager, we need
+                # a way to check that this code path is not reachable
+                assert False
 
 
 if __name__ == '__main__':
