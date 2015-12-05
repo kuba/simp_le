@@ -2,7 +2,7 @@
 #
 # Simple Let's Encrypt client.
 #
-# Copyright (C) 2016  Jakub Warmuz
+# Copyright (C) 2015  Jakub Warmuz
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
