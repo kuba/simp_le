@@ -412,10 +412,9 @@ class FullFile(OpenSSLIOPlugin):
 
     def save(self, data):  # pylint: disable=missing-docstring
         logger.info('Saving %s', self.path)
-        output = [ (self.dump_key(data.key)) ]
+        output = [(self.dump_key(data.key))]
         output.append(self.dump_cert(data.cert))
-        output.extend(self.dump_cert(cert_data)
-                for cert_data in data.chain)
+        output.extend(self.dump_cert(cert_data) for cert_data in data.chain)
         with open(self.path, 'wb') as full_file:
             full_file.write(self._SEP.join(output))
 
