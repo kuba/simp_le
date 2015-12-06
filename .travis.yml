@@ -43,6 +43,8 @@ matrix:
     - env: TOXENV=py35
       python: 3.5
 
+# source is used mainly for eval+gimme, so `install` can use the right
+# Go environment
 before_install: . ./tests/travis.sh before_install
 install: . ./tests/travis.sh install
 script: . ./tests/travis.sh script
