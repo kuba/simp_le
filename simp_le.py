@@ -867,10 +867,7 @@ def valid_existing_data(data, vhosts, valid_min):
                         'want to proceed.')
 
         # Renew?
-        if not renewal_necessary(data.cert, valid_min):
-            return True
-        else:
-            return False
+        return not renewal_necessary(data.cert, valid_min)
 
 
 def registered_client(args):
