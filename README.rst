@@ -10,7 +10,7 @@ Simple `Let’s Encrypt`_ client.
     simp_le --email you@example.com \
       -f fullchain.pem -f key.pem \
       -d example.com -d www.example.com --default_root /var/www/html \
-      -d other.com:/var/www/other_html
+      -d example.net:/var/www/other_html
 
 For more info see ``simp_le --help``.
 
