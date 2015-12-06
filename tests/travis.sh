@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # This script is sourced in .travis.yml, and `source` doesn't take
-# into evaluate the sheebang line, so it needs to be set explicitly
+# into evaluate the shebang line, so it needs to be set explicitly
 # here. Otherwise tests will happily pass despite non-zero exit codes
 # from some of the commands in this file (#39).
 set -xe
