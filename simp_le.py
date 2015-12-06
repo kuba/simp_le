@@ -289,7 +289,8 @@ class IOPlugin(object):
     @classmethod
     def register(cls, **kwargs):
         """Register IO plugin."""
-        def _reg(plugin_cls):  # pylint: disable=missing-docstring
+        def _reg(plugin_cls):
+            """Initialize plugin class and register."""
             plugin = plugin_cls(**kwargs)
             assert (os.path.sep not in plugin.path and
                     plugin.path not in ('.', '..'))
@@ -459,15 +460,15 @@ class ChainFile(OpenSSLFileIOPlugin):
 
     _SEP = b'\n\n'  # TODO: do all webservers like this?
 
-    def persisted(self):  # pylint: disable=missing-docstring
+    def persisted(self):
         return self.Data(key=False, cert=False, chain=True)
 
-    def load_from_content(self, output):  # pylint: disable=missing-docstring
+    def load_from_content(self, output):
         chain = [self.load_cert(cert_data)
                  for cert_data in output.split(self._SEP)]
         return self.Data(key=None, cert=None, chain=chain)
 
-    def save(self, data):  # pylint: disable=missing-docstring
+    def save(self, data):
         return self.save_to_file(self._SEP.join(
             self.dump_cert(chain_cert) for chain_cert in data.chain))
 
@@ -477,10 +478,10 @@ class ChainFile(OpenSSLFileIOPlugin):
 class FullChainFile(ChainFile):
     """Full chain file plugin."""
 
-    def persisted(self):  # pylint: disable=missing-docstring
+    def persisted(self):
         return self.Data(key=False, cert=True, chain=True)
 
-    def load(self):  # pylint: disable=missing-docstring
+    def load(self):
         data = super(FullChainFile, self).load()
         if data.chain is None:
             cert, chain = None, None
@@ -488,7 +489,7 @@ class FullChainFile(ChainFile):
             cert, chain = data.chain[0], data.chain[1:]
         return self.Data(key=data.key, cert=cert, chain=chain)
 
-    def save(self, data):  # pylint: disable=missing-docstring
+    def save(self, data):
         return super(FullChainFile, self).save(self.Data(
             key=data.key, cert=None, chain=([data.cert] + data.chain)))
 
@@ -498,13 +499,13 @@ class FullChainFile(ChainFile):
 class KeyFile(OpenSSLFileIOPlugin):
     """Private key file plugin."""
 
-    def persisted(self):  # pylint: disable=missing-docstring
+    def persisted(self):
         return self.Data(key=True, cert=False, chain=False)
 
     def load_from_content(self, output):
         return self.Data(key=self.load_key(output), cert=None, chain=None)
 
-    def save(self, data):  # pylint: disable=missing-docstring
+    def save(self, data):
         return self.save_to_file(self.dump_key(data.key))
 
 
@@ -513,13 +514,13 @@ class KeyFile(OpenSSLFileIOPlugin):
 class CertFile(OpenSSLFileIOPlugin):
     """Certificate file plugin."""
 
-    def persisted(self):  # pylint: disable=missing-docstring
+    def persisted(self):
         return self.Data(key=False, cert=True, chain=False)
 
-    def load_from_content(self, output):  # pylint: disable=missing-docstring
+    def load_from_content(self, output):
         return self.Data(key=None, cert=self.load_cert(output), chain=None)
 
-    def save(self, data):  # pylint: disable=missing-docstring
+    def save(self, data):
         return self.save_to_file(self.dump_cert(data.cert))
 
 
