@@ -786,14 +786,21 @@ def test(args):
             suite).wasSuccessful() else EXIT_ERROR
 
 
-def plugins_persist_all(ioplugins):
+def check_plugins_persist_all(ioplugins):
     """Do plugins cover all components (key/cert/chain)?"""
     persisted = IOPlugin.Data(
         account_key=False, key=False, cert=False, chain=False)
     for plugin_name in ioplugins:
         persisted = IOPlugin.Data(*componentwise_or(
             persisted, IOPlugin.registered[plugin_name].persisted()))
-    return False not in persisted
+
+    not_persisted = set([
+        component
+        for component, persist in six.iteritems(persisted._asdict())
+        if not persist])
+    if not_persisted:
+        raise Error('Selected IO plugins do not cover the following '
+                    'components: %s.' % ', '.join(not_persisted))
 
 
 def load_existing_data(ioplugins):
@@ -1042,8 +1049,7 @@ def main_with_exceptions(cli_args):
 
     if args.vhosts is None:
         raise Error('You must set at least one -d/--vhost')
-    if not plugins_persist_all(args.ioplugins):
-        raise Error("Selected IO plugins do not cover all components.")
+    check_plugins_persist_all(args.ioplugins)
 
     existing_data = load_existing_data(args.ioplugins)
     if valid_existing_cert(existing_data.cert, args.vhosts, args.valid_min):
