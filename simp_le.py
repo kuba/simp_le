@@ -605,7 +605,11 @@ def create_parser():
     )
     io_group.add_argument(
         '--valid_min', type=int, default=DEFAULT_VALID_MIN, metavar='SECONDS',
-        help="Minimum validity of the resulting certificate.",
+        help='Minimum validity of the resulting certificate.',
+    )
+    io_group.add_argument(
+        '--reuse_key', action='store_true', default=False,
+        help='Reuse private key if it was previously persisted.',
     )
 
     reg = parser.add_argument_group(
@@ -846,25 +850,24 @@ def load_existing_data(ioplugins):
     return all_existing
 
 
-def valid_existing_data(ioplugins, vhosts, valid_min):
+def valid_existing_data(data, vhosts, valid_min):
     """Is the existing cert data valid for enough time?"""
-    existing = load_existing_data(ioplugins)
     # All or nothing!
-    assert existing == IOPlugin.EMPTY_DATA or None not in existing
+    assert data == IOPlugin.EMPTY_DATA or None not in data
 
-    if existing != IOPlugin.EMPTY_DATA:
+    if data != IOPlugin.EMPTY_DATA:
         # pylint: disable=protected-access
-        existing_sans = crypto_util._pyopenssl_cert_or_req_san(existing.cert)
-        logger.debug('Existing SANs: %r', existing_sans)
+        sans = crypto_util._pyopenssl_cert_or_req_san(data.cert)
+        logger.debug('Existing SANs: %r', sans)
 
-        requested_sans = set(vhost.name for vhost in vhosts)
-        if detect_and_log_mismatch('SANs', set(existing_sans), requested_sans,
-                                   log_data=', '.join):
+        if detect_and_log_mismatch(
+                'SANs', set(sans), set(vhost.name for vhost in vhosts),
+                log_data=', '.join):
             raise Error('Backup and remove existing persisted data if you '
                         'want to proceed.')
 
         # Renew?
-        if not renewal_necessary(existing.cert, valid_min):
+        if not renewal_necessary(data.cert, valid_min):
             return True
         else:
             return False
@@ -926,7 +929,7 @@ def get_certr(client, csr, authorizations):
     return certr
 
 
-def new_data(args):
+def new_data(args, existing):
     """Issue and persist new key/cert/chain."""
     roots = compute_roots(args.vhosts, args.default_root)
     logger.debug('Computed roots: %r', roots)
@@ -958,7 +961,12 @@ def new_data(args):
 
         client.answer_challenge(challb, response)
 
-    key = gen_pkey(args.cert_key_size)
+    if args.reuse_key and existing.key is not None:
+        logger.info('Reusing existing certificate private key')
+        key = existing.key
+    else:
+        logger.info('Generating new certificate private key')
+        key = gen_pkey(args.cert_key_size)
     csr = gen_csr(key, [vhost.name.encode() for vhost in args.vhosts])
     certr = get_certr(client, csr, authorizations)
     persist_data(args, IOPlugin.Data(
@@ -1011,12 +1019,13 @@ def main_with_exceptions(cli_args):
     if not plugins_persist_all(args.ioplugins):
         raise Error("Selected IO plugins do not cover all components.")
 
-    if valid_existing_data(args.ioplugins, args.vhosts, args.valid_min):
+    existing_data = load_existing_data(args.ioplugins)
+    if valid_existing_data(existing_data, args.vhosts, args.valid_min):
         logger.info('Certificates already exist and renewal is not '
                     'necessary, exiting with status code %d.', EXIT_NO_RENEWAL)
         return EXIT_NO_RENEWAL
     else:
-        new_data(args)
+        new_data(args, existing_data)
         return EXIT_RENEWAL
 
 
