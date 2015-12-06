@@ -50,9 +50,10 @@ integration_script() {
   pip -V
 
   simp_le -v --server ${SERVER?} --tos_sha256 ${TOS_SHA256?} \
-    -f key.pem -f cert.pem -f fullchain.pem -d le.wtf:public_html
+    -f account_key.json -f key.pem -f cert.pem -f fullchain.pem \
+    -d le.wtf:public_html
 
-  simp_le -v --server ${SERVER?} --revoke -f cert.pem
+  simp_le -v --server ${SERVER?} --revoke -f account_key.json -f cert.pem
 }
 
 if [ "py${TOXENV#py}" = "${TOXENV}" ]; then

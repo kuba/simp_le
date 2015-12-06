@@ -7,7 +7,7 @@ Simple `Let’s Encrypt`_ client.
 
 .. code:: shell
 
-    simp_le --email you@example.com \
+    simp_le --email you@example.com -f account_key.json \
       -f fullchain.pem -f key.pem \
       -d example.com -d www.example.com --default_root /var/www/html \
       -d example.net:/var/www/other_html
