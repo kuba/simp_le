@@ -134,7 +134,7 @@ def load_cert(*args, **kwargs):
 
 
 class AccountKey(object):
-    """Acount key loading/saving."""
+    """Account key loading/saving."""
     PATH = 'account_key.json'
 
     @classmethod
@@ -233,11 +233,11 @@ class IOPlugin(object):
     Data = collections.namedtuple('IOPluginData', 'key cert chain')
     """Plugin data.
 
-    Unless otherwise stated, plugin data compoenents are typically
+    Unless otherwise stated, plugin data components are typically
     filled with the following data:
 
     - for `key`: private key, an instance of `OpenSSL.crypto.PKey`
-    - for `cert`: corresponging certificate, an instance of
+    - for `cert`: corresponding certificate, an instance of
       `OpenSSL.crypto.X509`
     - for `chain`: certificate chain, a list of
       `OpenSSL.crypto.X509` instances
@@ -252,8 +252,8 @@ class IOPlugin(object):
     def persisted(self):
         """Which data is persisted by this plugin?
 
-        This method must be overriden in subclasses and must return
-        `IOPlugin.Data` with boolean values indicating whether specific
+        This method must be overridden in subclasses and must return
+        `IOPlugin.Data` with Boolean values indicating whether specific
         component is persisted by the plugin.
         """
         raise NotImplementedError()
@@ -262,7 +262,7 @@ class IOPlugin(object):
     def load(self):
         """Load persisted data.
 
-        This method must be overriden in subclasses and must return
+        This method must be overridden in subclasses and must return
         `IOPlugin.Data`. For all non-persisted data it must set the
         corresponding component to `None`. If the data was not persisted
         previously, it must return `EMPTY_DATA` (note that it does not
@@ -277,10 +277,10 @@ class IOPlugin(object):
     def save(self, data):
         """Save data to file system.
 
-        This method must be overriden in subclasses and must accept
+        This method must be overridden in subclasses and must accept
         `IOPlugin.Data`. It must store all persisted components and
-        ignore all non-persisted compoenents. It is guaranted that all
-        persisted compoents are not `None`.
+        ignore all non-persisted components. It is guaranteed that all
+        persisted components are not `None`.
         """
         raise NotImplementedError()
 
@@ -437,7 +437,7 @@ class OpenSSLFileIOPlugin(OpenSSLIOPlugin):
     def load_from_content(self, content):
         """Load from file contents.
 
-        This method must be overriden in subclasses. It will be called
+        This method must be overridden in subclasses. It will be called
         with the contents of the file read from `path` and should return
         whatever `IOPlugin.load` is meant to return.
         """
