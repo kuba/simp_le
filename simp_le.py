@@ -842,7 +842,12 @@ def valid_existing_data(ioplugins, vhosts, valid_min):
         existing_sans = crypto_util._pyopenssl_cert_or_req_san(existing.cert)
         logger.debug('Existing SANs: %r', existing_sans)
 
-        assert set(existing_sans) == set(vhost.name for vhost in vhosts)
+        requested_sans = set(vhost.name for vhost in vhosts)
+        if set(existing_sans) != requested_sans:
+            raise Error('SANs found in the existing certificate (%s) do NOT '
+                        'match the requested ones (%s). Backup and remove '
+                        'existing persisted data if you want to proceed.',
+                        ', '.join(existing_sans), ', '.join(requested_sans))
 
         # Renew?
         if not renewal_necessary(existing.cert, valid_min):
