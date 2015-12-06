@@ -851,7 +851,22 @@ def load_existing_data(ioplugins):
 
 
 def valid_existing_data(data, vhosts, valid_min):
-    """Is the existing cert data valid for enough time?"""
+    """Is the existing cert data valid for enough time?
+
+    >>> valid_existing_data(IOPlugin.EMPTY_DATA, [], 0)
+    False
+    >>> cert = crypto_util.gen_ss_cert(
+    ...     gen_pkey(1024), ['example.com'], validity=(60 *60))
+    >>> data = IOPlugin.Data(key=mock.sentinel.key, cert=cert, chain=[])
+    >>> valid_existing_data(data, [Vhost.decode('example.com')], 0)
+    True
+    >>> valid_existing_data(data, [Vhost.decode('example.com')], 60 * 60 + 1)
+    False
+    >>> valid_existing_data(data, [Vhost.decode('example.net')], 0)
+    Traceback (most recent call last):
+    ...
+    Error: Backup and remove existing persisted data if you want to proceed.
+    """
     # All or nothing!
     assert data == IOPlugin.EMPTY_DATA or None not in data
 
