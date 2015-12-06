@@ -43,7 +43,7 @@ matrix:
     - env: TOXENV=py35
       python: 3.5
 
-before_install: . ./tests/travis.sh before_install
+before_install: set -e; . ./tests/travis.sh before_install
 install: . ./tests/travis.sh install
 script: . ./tests/travis.sh script
 
