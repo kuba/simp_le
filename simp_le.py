@@ -743,14 +743,13 @@ def componentwise_or(first, second):
     return tuple(x or y for x, y in zip(first, second))
 
 
-def persist_data(args, cert, chain, key):
+def persist_data(args, data):
     """Persist data on disk.
 
     Uses all selected plugins to save certificate data to disk.
     """
     for plugin_name in args.ioplugins:
-        IOPlugin.registered[plugin_name].save(
-            IOPlugin.Data(key=key, cert=cert, chain=chain))
+        IOPlugin.registered[plugin_name].save(data)
 
 
 def asn1_generalizedtime_to_dt(timestamp):
@@ -962,7 +961,8 @@ def new_data(args):
     key = gen_pkey(args.cert_key_size)
     csr = gen_csr(key, [vhost.name.encode() for vhost in args.vhosts])
     certr = get_certr(client, csr, authorizations)
-    persist_data(args, certr.body, client.fetch_chain(certr), key)
+    persist_data(args, IOPlugin.Data(
+        key=key, cert=certr.body, chain=client.fetch_chain(certr)))
 
 
 def revoke(args):
