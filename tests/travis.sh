@@ -1,4 +1,10 @@
-#!/bin/sh -xe
+#!/bin/sh
+
+# This script is sourced in .travis.yml, and `source` doesn't take
+# into evaluate the sheebang line, so it needs to be set explicitly
+# here. Otherwise tests will happily pass despite non-zero exit codes
+# from some of the commands in this file (#39).
+set -xe
 
 SERVER=http://localhost:4000/directory
 TOS_SHA256=3ae9d8149e59b8845069552fdae761c3a042fc5ede1fcdf8f37f7aa4707c4d6e
