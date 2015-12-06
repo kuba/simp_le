@@ -83,7 +83,7 @@ class TestCase(unittest.TestCase):
 def gen_pkey(bits):
     """Generate a private key.
 
-    >>> gen_pkey(1024)  # doctest: +ELLIPSIS
+    >>> gen_pkey(1024)
     <OpenSSL.crypto.PKey object at 0x...>
 
     Args:
@@ -803,7 +803,8 @@ def renewal_necessary(cert, valid_min):
 def test(args):
     """Run tests (--test)."""
     suite = unittest.TestSuite((
-        doctest.DocTestSuite(),
+        doctest.DocTestSuite(optionflags=(
+            doctest.ELLIPSIS | doctest.IGNORE_EXCEPTION_DETAIL)),
         unittest.defaultTestLoader.loadTestsFromName(__name__)
     ))
     return EXIT_TESTS_OK if unittest.TextTestRunner(
@@ -874,8 +875,7 @@ def valid_existing_data(data, vhosts, valid_min):
     ...     IOPlugin.Data(key=None, cert=cert, chain=[]), [], 0)
     Traceback (most recent call last):
     ...
-    Error: Existing data is missing some components. \
-Are you using the same plugins as previously?
+    Error: Existing data is missing some components...
     """
     # All or nothing!
     if data != IOPlugin.EMPTY_DATA and None in data:
