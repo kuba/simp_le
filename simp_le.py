@@ -855,18 +855,17 @@ def valid_existing_data(data, vhosts, valid_min):
     # All or nothing!
     assert data == IOPlugin.EMPTY_DATA or None not in data
 
-    if data != IOPlugin.EMPTY_DATA:
+    if data == IOPlugin.EMPTY_DATA:
+        return False  # no existing
+    else:  # renew existing?
         # pylint: disable=protected-access
         sans = crypto_util._pyopenssl_cert_or_req_san(data.cert)
         logger.debug('Existing SANs: %r', sans)
-
         if detect_and_log_mismatch(
                 'SANs', set(sans), set(vhost.name for vhost in vhosts),
                 log_data=', '.join):
             raise Error('Backup and remove existing persisted data if you '
                         'want to proceed.')
-
-        # Renew?
         return not renewal_necessary(data.cert, valid_min)
 
 
