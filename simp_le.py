@@ -860,48 +860,37 @@ def pyopenssl_cert_or_req_san(cert):
     return crypto_util._pyopenssl_cert_or_req_san(cert)
 
 
-def valid_existing_data(data, vhosts, valid_min):
+def valid_existing_cert(cert, vhosts, valid_min):
     """Is the existing cert data valid for enough time?
 
-    >>> valid_existing_data(IOPlugin.EMPTY_DATA, [], 0)
+    >>> valid_existing_cert(None, [], 0)
     False
     >>> cert = crypto_util.gen_ss_cert(
     ...     gen_pkey(1024), ['example.com'], validity=(60 *60))
-    >>> data = IOPlugin.Data(key=mock.sentinel.key, cert=cert, chain=[])
-    >>> valid_existing_data(data, [Vhost.decode('example.com')], 0)
+    >>> valid_existing_cert(cert, [Vhost.decode('example.com')], 0)
     True
-    >>> valid_existing_data(data, [Vhost.decode('example.com')], 60 * 60 + 1)
+    >>> valid_existing_cert(cert, [Vhost.decode('example.com')], 60 * 60 + 1)
     False
-    >>> valid_existing_data(data, [Vhost.decode('example.net')], 0)
+    >>> valid_existing_cert(cert, [Vhost.decode('example.net')], 0)
     Traceback (most recent call last):
     ...
     Error: Backup and remove existing persisted data if you want to proceed.
-    >>> valid_existing_data(data, [], 0)
+    >>> valid_existing_cert(cert, [], 0)
     Traceback (most recent call last):
     ...
     Error: Backup and remove existing persisted data if you want to proceed.
-    >>> valid_existing_data(
-    ...     IOPlugin.Data(key=None, cert=cert, chain=[]), [], 0)
-    Traceback (most recent call last):
-    ...
-    Error: Existing data is missing some components...
     """
-    # All or nothing!
-    if data != IOPlugin.EMPTY_DATA and None in data:
-        raise Error('Existing data is missing some components. '
-                    'Are you using the same plugins as previously?')
-
-    if data == IOPlugin.EMPTY_DATA:
-        return False  # no existing
+    if cert is None:
+        return False  # no existing certificate
     else:  # renew existing?
-        sans = pyopenssl_cert_or_req_san(data.cert)
+        sans = pyopenssl_cert_or_req_san(cert)
         logger.debug('Existing SANs: %r', sans)
         if detect_and_log_mismatch(
                 'SANs', set(sans), set(vhost.name for vhost in vhosts),
                 log_data=', '.join):
-            raise Error('Backup and remove existing persisted data if you '
-                        'want to proceed.')
-        return not renewal_necessary(data.cert, valid_min)
+            raise Error(
+                'Backup and remove existing cert if you want to proceed.')
+        return not renewal_necessary(cert, valid_min)
 
 
 def registered_client(args):
@@ -1051,7 +1040,7 @@ def main_with_exceptions(cli_args):
         raise Error("Selected IO plugins do not cover all components.")
 
     existing_data = load_existing_data(args.ioplugins)
-    if valid_existing_data(existing_data, args.vhosts, args.valid_min):
+    if valid_existing_cert(existing_data.cert, args.vhosts, args.valid_min):
         logger.info('Certificates already exist and renewal is not '
                     'necessary, exiting with status code %d.', EXIT_NO_RENEWAL)
         return EXIT_NO_RENEWAL
