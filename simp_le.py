@@ -830,7 +830,7 @@ def load_existing_data(ioplugins):
     return all_existing
 
 
-def _valid_existing_data(ioplugins, vhosts, valid_min):
+def valid_existing_data(ioplugins, vhosts, valid_min):
     """Is the existing cert data valid for enough time?"""
     existing = load_existing_data(ioplugins)
     # All or nothing!
@@ -850,7 +850,7 @@ def _valid_existing_data(ioplugins, vhosts, valid_min):
             return False
 
 
-def _registered_client(args):
+def registered_client(args):
     """Create ACME client, register if necessary."""
     key = AccountKey.get(args)
     net = acme_client.ClientNetwork(key, user_agent=args.user_agent)
@@ -872,12 +872,12 @@ def _registered_client(args):
     return client
 
 
-def _new_data(args):
+def new_data(args):
     """Issue and persist new key/cert/chain."""
     roots = compute_roots(args.vhosts, args.default_root)
     logger.debug('Computed roots: %r', roots)
 
-    client = _registered_client(args)
+    client = registered_client(args)
 
     authorizations = dict(
         (vhost.name, client.request_domain_challenges(
@@ -957,12 +957,12 @@ def main_with_exceptions(cli_args):
     if not plugins_persist_all(args.ioplugins):
         raise Error("Selected IO plugins do not cover all components.")
 
-    if _valid_existing_data(args.ioplugins, args.vhosts, args.valid_min):
+    if valid_existing_data(args.ioplugins, args.vhosts, args.valid_min):
         logger.info('Certificates already exist and renewal is not '
                     'necessary, exiting with status code %d.', EXIT_NO_RENEWAL)
         return EXIT_NO_RENEWAL
     else:
-        _new_data(args)
+        new_data(args)
         return EXIT_RENEWAL
 
 
