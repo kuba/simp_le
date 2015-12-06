@@ -866,9 +866,21 @@ def valid_existing_data(data, vhosts, valid_min):
     Traceback (most recent call last):
     ...
     Error: Backup and remove existing persisted data if you want to proceed.
+    >>> valid_existing_data(data, [], 0)
+    Traceback (most recent call last):
+    ...
+    Error: Backup and remove existing persisted data if you want to proceed.
+    >>> valid_existing_data(
+    ...     IOPlugin.Data(key=None, cert=cert, chain=[]), [], 0)
+    Traceback (most recent call last):
+    ...
+    Error: Existing data is missing some components. \
+Are you using the same plugins as previously?
     """
     # All or nothing!
-    assert data == IOPlugin.EMPTY_DATA or None not in data
+    if data != IOPlugin.EMPTY_DATA and None in data:
+        raise Error('Existing data is missing some components. '
+                    'Are you using the same plugins as previously?')
 
     if data == IOPlugin.EMPTY_DATA:
         return False  # no existing
