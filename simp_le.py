@@ -353,16 +353,16 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
     "persisted|load|save protocol":
 
     - whenever the script is called with `persisted` as the first
-      argument, it should send to STDOUT a subset of three keywords:
-      `key`, `cart`, `chain` (in any order, using any separation
-      character);
+      argument, it should send to STDOUT a single line consisting of a
+      subset of three keywords: `key`, `cart`, `chain` (in any order,
+      separated by whitespace);
 
     - whenever the script is called with `load` as the first argument
       it shall write to STDOUT all persisted data as PEM encoded strings
-      separated by double newline characters (`\n\n`) in the following
+      separated by double newline characters (`\\n\\n`) in the following
       order: key, certificate, certificates in the chain (from leaf to
-      root, also separated using `\n\n`). If some data is not persisted,
-      it must be skipped in the output;
+      root, also separated using `\\n\\n`). If some data is not
+      persisted, it must be skipped in the output;
 
     - whenever the script is called with `save` as the first argument,
       it should accept data from STDIN and persist it. Data is encoded
