@@ -1029,23 +1029,27 @@ def main_with_exceptions(cli_args):
         return EXIT_RENEWAL
 
 
+def exit_with_error(message):
+    """Print `message` and debugging tips to STDERR, exit with EXIT_ERROR."""
+    sys.stderr.write('%s\n\nDebugging tips: -v improves output verbosity. '
+                     'Help is available under --help.\n' % message)
+    raise SystemExit(EXIT_ERROR)
+
+
 def main(cli_args=sys.argv[1:]):
     """Run the script, with exceptions caught and printed to STDERR."""
     # logging (handler) is not set up yet, use STDERR only!
     try:
         raise SystemExit(main_with_exceptions(cli_args))
     except Error as error:
-        sys.stderr.write('%s\n' % error)
-        raise SystemExit(EXIT_ERROR)
+        exit_with_error(error)
     except messages.Error as error:
-        sys.stderr.write('ACME server returned an error: %s\n' % error)
-        raise SystemExit(EXIT_ERROR)
-    except Exception as error:
+        exit_with_error('ACME server returned an error: %s\n' % error)
+    except Exception as error:  # pylint: disable=broad-except
         # maintain manifest invariant: `exit 1` iff renewal not
         # necessary, `exit 2` iff error
-        sys.stderr.write('Unhandled error has happened:\n')
         traceback.print_exc(file=sys.stderr)
-        raise SystemExit(EXIT_ERROR)
+        exit_with_error('\nUnhandled error has happened, traceback is above')
 
 
 class MainIntegrationTests(TestCase):
