@@ -406,13 +406,13 @@ class FullFile(OpenSSLIOPlugin):
             output = full_file.read().split(self._SEP)
         key = self.load_key(output.pop(0))
         cert = self.load_cert(output.pop(0))
-        chain = ([self.load_cert(cert_data) for cert_data in output])
+        chain = [self.load_cert(cert_data) for cert_data in output]
 
         return self.Data(key=key, cert=cert, chain=chain)
 
     def save(self, data):  # pylint: disable=missing-docstring
         logger.info('Saving %s', self.path)
-        output = [(self.dump_key(data.key))]
+        output = [self.dump_key(data.key)]
         output.append(self.dump_cert(data.cert))
         output.extend(self.dump_cert(cert_data) for cert_data in data.chain)
         with open(self.path, 'wb') as full_file:
