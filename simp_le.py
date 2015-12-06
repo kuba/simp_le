@@ -773,6 +773,7 @@ def asn1_generalizedtime_to_dt(timestamp):
     """
     dt = datetime.datetime.strptime(  # pylint: disable=invalid-name
         timestamp[:12], '%Y%m%d%H%M%S')
+    # tzinfo, pylint bug | pylint: disable=redefined-variable-type
     if timestamp.endswith('Z'):
         tzinfo = pytz.utc
     else:
@@ -851,6 +852,14 @@ def load_existing_data(ioplugins):
     return all_existing
 
 
+def pyopenssl_cert_or_req_san(cert):
+    """SANs from cert or csr."""
+    # This function is not inlined mainly because pylint is bugged
+    # when it comes to locally disabling protected access...
+    # pylint: disable=protected-access
+    return crypto_util._pyopenssl_cert_or_req_san(cert)
+
+
 def valid_existing_data(data, vhosts, valid_min):
     """Is the existing cert data valid for enough time?
 
@@ -885,8 +894,7 @@ def valid_existing_data(data, vhosts, valid_min):
     if data == IOPlugin.EMPTY_DATA:
         return False  # no existing
     else:  # renew existing?
-        # pylint: disable=protected-access
-        sans = crypto_util._pyopenssl_cert_or_req_san(data.cert)
+        sans = pyopenssl_cert_or_req_san(data.cert)
         logger.debug('Existing SANs: %r', sans)
         if detect_and_log_mismatch(
                 'SANs', set(sans), set(vhost.name for vhost in vhosts),
