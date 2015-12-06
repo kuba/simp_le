@@ -829,26 +829,36 @@ def load_existing_data(ioplugins):
       `IOPlugin.Data` with all plugin data merged and sanity checked
       for coherence.
     """
-    all_existing = IOPlugin.EMPTY_DATA
+    def merge(first, second, field):
+        """Merge data from two plugins.
 
+        >>> add(None, 1, 'foo')
+        1
+        >>> add(1, None, 'foo')
+        1
+        >>> add(None, None, 'foo')
+        None
+        >>> add(1, 2, 'foo')
+        Error: Some plugins returned conflicting data for the "foo" component
+        """
+        if first is not None and second is not None and first != second:
+            raise Error('Some plugins returned conflicting data for '
+                        'the "%s" component' % field)
+        return first or second
+
+    all_existing = IOPlugin.EMPTY_DATA
     for plugin_name in ioplugins:
         all_persisted = IOPlugin.registered[plugin_name].persisted()
         all_data = IOPlugin.registered[plugin_name].load()
 
-        new_components = []
-        for persisted, data, existing in zip(
-                all_persisted, all_data, all_existing):
-            if not persisted:
-                new_components.append(existing)
-            # otherwise plugin is persisting this component, so either:
-            # - all other plugins didn't yet save any data (None)
-            # - all plugins saved the same data (not None)
-            elif existing is not None and existing != data:
-                raise Error('Some plugins returned conflicting data')
-            else:
-                new_components.append(data)
-        all_existing = IOPlugin.Data(*new_components)
+        # Check that plugins obey the interface: "`not persisted`
+        # implies `data is None`" which is equivalent to `persisted or
+        # data is None`
+        assert all(persisted or data is None
+                   for persisted, data in zip(all_persisted, all_data))
 
+        all_existing = IOPlugin.Data(*(merge(*data) for data in zip(
+            all_existing, all_data, all_data._fields)))
     return all_existing
 
 
