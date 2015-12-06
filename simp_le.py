@@ -102,8 +102,8 @@ def gen_csr(pkey, domains, sig_hash="sha256"):
     """Generate a CSR.
 
     >>> crypto_util._pyopenssl_cert_or_req_san(
-    ...     gen_csr(gen_pkey(1024), [b'example.com', b'example2.com']))
-    ['example.com', 'example2.com']
+    ...     gen_csr(gen_pkey(1024), [b'example.com', b'example.net']))
+    ['example.com', 'example.net']
 
     Args:
       pkey: Private key.
