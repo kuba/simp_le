@@ -289,14 +289,14 @@ class IOPlugin(object):
     @classmethod
     def register(cls, **kwargs):
         """Register IO plugin."""
-        def _reg(plugin_cls):
+        def init_and_reg(plugin_cls):
             """Initialize plugin class and register."""
             plugin = plugin_cls(**kwargs)
             assert (os.path.sep not in plugin.path and
                     plugin.path not in ('.', '..'))
             cls.registered[plugin.path] = plugin
             return plugin_cls
-        return _reg
+        return init_and_reg
 
 
 class OpenSSLIOPlugin(IOPlugin):  # pylint: disable=abstract-method
@@ -651,7 +651,7 @@ def supported_challb(authorization):
     return None
 
 
-def _compute_roots(vhosts, default_root):
+def compute_roots(vhosts, default_root):
     """Compute webroots.
 
     Args:
@@ -791,7 +791,7 @@ def test(args):
             suite).wasSuccessful() else EXIT_ERROR
 
 
-def _plugins_persist_all(ioplugins):
+def plugins_persist_all(ioplugins):
     """Do plugins cover all components (key/cert/chain)?"""
     persisted = IOPlugin.Data(key=False, cert=False, chain=False)
     for plugin_name in ioplugins:
@@ -800,7 +800,7 @@ def _plugins_persist_all(ioplugins):
     return persisted == IOPlugin.Data(key=True, cert=True, chain=True)
 
 
-def _load_existing_data(ioplugins):
+def load_existing_data(ioplugins):
     """Load existing data from disk.
 
     Returns:
@@ -832,7 +832,7 @@ def _load_existing_data(ioplugins):
 
 def _valid_existing_data(ioplugins, vhosts, valid_min):
     """Is the existing cert data valid for enough time?"""
-    existing = _load_existing_data(ioplugins)
+    existing = load_existing_data(ioplugins)
     # All or nothing!
     assert existing == IOPlugin.EMPTY_DATA or None not in existing
 
@@ -874,7 +874,7 @@ def _registered_client(args):
 
 def _new_data(args):
     """Issue and persist new key/cert/chain."""
-    roots = _compute_roots(args.vhosts, args.default_root)
+    roots = compute_roots(args.vhosts, args.default_root)
     logger.debug('Computed roots: %r', roots)
 
     client = _registered_client(args)
@@ -913,7 +913,7 @@ def _new_data(args):
 
 def revoke(args):
     """Revoke certificate."""
-    existing = _load_existing_data(args.ioplugins)
+    existing = load_existing_data(args.ioplugins)
     if existing.cert is None:
         raise Error('No existing certificate')
 
@@ -924,7 +924,7 @@ def revoke(args):
     return EXIT_REVOKE_OK
 
 
-def _setup_logging(verbose):
+def setup_logging(verbose):
     """Setup basic logging."""
     level = logging.DEBUG if verbose else logging.INFO
     root_logger = logging.getLogger()
@@ -939,14 +939,14 @@ def _setup_logging(verbose):
     root_logger.addHandler(handler)
 
 
-def _main(cli_args):
+def main_with_exceptions(cli_args):
     """Run the script, throw exceptions on error."""
     args = create_parser().parse_args(cli_args)
 
     if args.test:  # --test
         return test(args)
 
-    _setup_logging(args.verbose)
+    setup_logging(args.verbose)
     logger.debug('%r parsed as %r', cli_args, args)
 
     if args.revoke:  # --revoke
@@ -954,7 +954,7 @@ def _main(cli_args):
 
     if args.vhosts is None:
         raise Error('You must set at least one -d/--vhost')
-    if not _plugins_persist_all(args.ioplugins):
+    if not plugins_persist_all(args.ioplugins):
         raise Error("Selected IO plugins do not cover all components.")
 
     if _valid_existing_data(args.ioplugins, args.vhosts, args.valid_min):
@@ -970,7 +970,7 @@ def main(cli_args=sys.argv[1:]):
     """Run the script, with exceptions caught and printed to STDERR."""
     # logging (handler) is not set up yet, use STDERR only!
     try:
-        raise SystemExit(_main(cli_args))
+        raise SystemExit(main_with_exceptions(cli_args))
     except Error as error:
         sys.stderr.write('%s\n' % error)
         raise SystemExit(EXIT_ERROR)
