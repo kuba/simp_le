@@ -245,10 +245,13 @@ class IOPlugin(object):
 class FileIOPlugin(IOPlugin):
     """Plugin that saves/reads files on disk."""
 
+    READ_MODE = 'rb'
+    WRITE_MODE = 'wb'
+
     def load(self):
         logger.debug('Loading %s', self.path)
         try:
-            with open(self.path, 'rb') as persist_file:
+            with open(self.path, self.READ_MODE) as persist_file:
                 content = persist_file.read()
         except IOError as error:
             if error.errno == errno.ENOENT:
@@ -272,7 +275,7 @@ class FileIOPlugin(IOPlugin):
         """Save data to file."""
         logger.info('Saving %s', self.path)
         try:
-            with open(self.path, 'wb') as persist_file:
+            with open(self.path, self.WRITE_MODE) as persist_file:
                 persist_file.write(data)
         except OSError as error:
             logging.exception(error)
@@ -296,6 +299,10 @@ class JWKIOPlugin(IOPlugin):  # pylint: disable=abstract-method
 @IOPlugin.register(path='account_key.json')
 class AccountKey(FileIOPlugin, JWKIOPlugin):
     """Account key IO Plugin using JWS."""
+
+    # this is not a binary file
+    READ_MODE = 'r'
+    WRITE_MODE = 'w'
 
     def persisted(self):
         return self.Data(account_key=True, key=False, cert=False, chain=False)
