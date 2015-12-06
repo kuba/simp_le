@@ -856,8 +856,12 @@ def registered_client(args):
     key = AccountKey.get(args)
     net = acme_client.ClientNetwork(key, user_agent=args.user_agent)
     client = acme_client.Client(directory=args.server, key=key, net=net)
+    if args.email is None:
+        logger.warning('--email was not provided; ACME CA will have no '
+                       'way of contacting you.')
+    new_reg = messages.NewRegistration.from_data(email=args.email)
     try:
-        regr = client.register()
+        regr = client.register(new_reg)
     except messages.Error as error:
         if error.detail != 'Registration key is already in use':
             raise
