@@ -133,6 +133,16 @@ def load_cert(*args, **kwargs):
         *args, **kwargs))
 
 
+def detect_and_log_mismatch(names, existing, requested, log_data=lambda x: x):
+    """Detect and log mismatch."""
+    if existing != requested:
+        logger.error('Existing (%s) and requested (%s) %s mismatch',
+                     log_data(existing), log_data(requested), names)
+        return True
+    else:
+        return False
+
+
 class AccountKey(object):
     """Account key loading/saving."""
     PATH = 'account_key.json'
@@ -168,9 +178,15 @@ class AccountKey(object):
             ))
             cls.save(account_key)
         else:
-            assert account_key.key.key_size == args.account_key_size
-            assert (account_key.public_key().key.public_numbers().e ==
-                    args.account_key_public_exponent)
+            mismatch = False
+            mismatch |= detect_and_log_mismatch(
+                'key sizes', account_key.key.key_size, args.account_key_size)
+            mismatch |= detect_and_log_mismatch(
+                'public key exponents',
+                account_key.public_key().key.public_numbers().e,
+                args.account_key_public_exponent)
+            if mismatch:
+                raise Error('Please adjust flags or backup and remove old key')
         return account_key
 
 
@@ -843,11 +859,10 @@ def valid_existing_data(ioplugins, vhosts, valid_min):
         logger.debug('Existing SANs: %r', existing_sans)
 
         requested_sans = set(vhost.name for vhost in vhosts)
-        if set(existing_sans) != requested_sans:
-            raise Error('SANs found in the existing certificate (%s) do NOT '
-                        'match the requested ones (%s). Backup and remove '
-                        'existing persisted data if you want to proceed.',
-                        ', '.join(existing_sans), ', '.join(requested_sans))
+        if detect_and_log_mismatch('SANs', set(existing_sans), requested_sans,
+                                   log_data=', '.join):
+            raise Error('Backup and remove existing persisted data if you '
+                        'want to proceed.')
 
         # Renew?
         if not renewal_necessary(existing.cert, valid_min):
@@ -924,8 +939,10 @@ def new_data(args):
             vhost.name, new_authz_uri=client.directory.new_authz))
         for vhost in args.vhosts
     )
-    assert all(supported_challb(auth) is not None
-               for auth in six.itervalues(authorizations))
+    if any(supported_challb(auth) is None
+           for auth in six.itervalues(authorizations)):
+        raise Error('CA did not offer http-01-only challenge combo. '
+                    'This client is unable to solve any other challenges.')
 
     for name, auth in six.iteritems(authorizations):
         challb = supported_challb(auth)
