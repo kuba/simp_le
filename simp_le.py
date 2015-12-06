@@ -49,6 +49,7 @@ import requests
 from acme import client as acme_client
 from acme import crypto_util
 from acme import challenges
+from acme import errors as acme_errors
 from acme import jose
 from acme import messages
 
@@ -872,6 +873,36 @@ def registered_client(args):
     return client
 
 
+def get_certr(client, csr, authorizations):
+    """Get Certificate Resource for specified CSR and authorizations."""
+    try:
+        certr, _ = client.poll_and_request_issuance(
+            csr, authorizations.values(),
+            # https://github.com/letsencrypt/letsencrypt/issues/1719
+            max_attempts=(10 * len(authorizations)))
+    except acme_errors.PollError as error:
+        if error.timeout:
+            logger.error('Timed out while waiting for CA to verify '
+                         'challenge(s) for the following authorizations: %s',
+                         ', '.join(authzr.uri for _, authzr in error.waiting))
+
+        invalid = [authzr for authzr in six.itervalues(error.updated)
+                   if authzr.body.status == messages.STATUS_INVALID]
+        if invalid:
+            logger.error('CA marked some of the authorizations as invalid, '
+                         'which likely means it could not access '
+                         'http://example.com/.well-known/acme-challenge/X. '
+                         'Did you set correct path in -d example.com:path '
+                         'or --default_root? Is there a warning log entry '
+                         'about unsuccessful self-verification? Are all your '
+                         'domains accessible from the internet? Failing '
+                         'authorizations: %s',
+                         ', '.join(authzr.uri for authzr in invalid))
+
+        raise Error('Challenge validation has failed, see error log.')
+    return certr
+
+
 def new_data(args):
     """Issue and persist new key/cert/chain."""
     roots = compute_roots(args.vhosts, args.default_root)
@@ -895,19 +926,16 @@ def new_data(args):
         verified = response.simple_verify(
             challb.chall, name, client.key.public_key())
         if not verified:
-            logger.warning('%s was not successfully verified by the '
-                           'client. CA is likely to fail as well!', name)
+            logger.warning('%s was not successfully self-verified. '
+                           'CA is likely to fail as well!', name)
         else:
-            logger.info('%s was successfully verified by the client', name)
+            logger.info('%s was successfully self-verified', name)
 
         client.answer_challenge(challb, response)
 
     key = gen_pkey(args.cert_key_size)
     csr = gen_csr(key, [vhost.name.encode() for vhost in args.vhosts])
-    certr, _ = client.poll_and_request_issuance(
-        csr, authorizations.values(),
-        # https://github.com/letsencrypt/letsencrypt/issues/1719
-        max_attempts=(10 * len(authorizations)))
+    certr = get_certr(client, csr, authorizations)
     persist_data(args, certr.body, client.fetch_chain(certr), key)
 
 
