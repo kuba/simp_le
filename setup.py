@@ -1,6 +1,12 @@
+import codecs
+import os
 import sys
 import setuptools
 
+
+here = os.path.abspath(os.path.dirname(__file__))
+readme = codecs.open(os.path.join(here, 'README.rst'), encoding='utf-8').read()
+version = '0'  # set static for now
 
 install_requires = [
     'acme==0.1.0',
@@ -25,15 +31,13 @@ tests_require = [
     'pylint',
 ]
 
-version = '0.0.1'  # set static for now
-
 setuptools.setup(
     name='simp_le',
     version=version,
     author='Jakub Warmuz',
     author_email='jakub@warmuz.org',
-    description="A Simple Let's Encrypt client",
-    long_description=open('README.rst').read(),
+    description="Simple Let's Encrypt Client",
+    long_description=readme,
     license='GPLv3',
     url='https://github.com/kuba/simp_le',
     py_modules=['simp_le'],
