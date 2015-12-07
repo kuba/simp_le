@@ -865,11 +865,11 @@ def valid_existing_cert(cert, vhosts, valid_min):
     >>> valid_existing_cert(cert, [Vhost.decode('example.net')], 0)
     Traceback (most recent call last):
     ...
-    Error: Backup and remove existing persisted data if you want to proceed.
+    Error: Backup and remove existing cert if you want to proceed
     >>> valid_existing_cert(cert, [], 0)
     Traceback (most recent call last):
     ...
-    Error: Backup and remove existing persisted data if you want to proceed.
+    Error: Backup and remove existing cert if you want to proceed
     """
     if cert is None:
         return False  # no existing certificate
@@ -880,7 +880,7 @@ def valid_existing_cert(cert, vhosts, valid_min):
                 'SANs', set(sans), set(vhost.name for vhost in vhosts),
                 log_data=', '.join):
             raise Error(
-                'Backup and remove existing cert if you want to proceed.')
+                'Backup and remove existing cert if you want to proceed')
         return not renewal_necessary(cert, valid_min)
 
 
