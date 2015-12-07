@@ -125,10 +125,69 @@ def gen_csr(pkey, domains, sig_hash="sha256"):
     return req
 
 
-def load_cert(*args, **kwargs):
-    """Load X509 certificate."""
-    return jose.ComparableX509(OpenSSL.crypto.load_certificate(
-        *args, **kwargs))
+class ComparablePKey(object):  # pylint: disable=too-few-public-methods
+    """Comparable key.
+
+    Suppose you have the following keys with the same material:
+
+    >>> pem = OpenSSL.crypto.dump_privatekey(
+    ...     OpenSSL.crypto.FILETYPE_PEM, gen_pkey(1024))
+    >>> k1 = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, pem)
+    >>> k2 = OpenSSL.crypto.load_privatekey(OpenSSL.crypto.FILETYPE_PEM, pem)
+
+    Unfortunately, in pyOpenSSL, equality is not well defined:
+
+    >>> k1 == k2
+    False
+
+    Using `ComparablePKey` you get the equality relation right:
+
+    >>> ck1, ck2 = ComparablePKey(k1), ComparablePKey(k2)
+    >>> other_ckey = ComparablePKey(gen_pkey(1024))
+    >>> ck1 == ck2
+    True
+    >>> ck1 == k1
+    False
+    >>> k1 == ck1
+    False
+    >>> other_ckey == ck1
+    False
+
+    Non-equalty is also well defined:
+
+    >>> ck1 != ck2
+    False
+    >>> ck1 != k1
+    True
+    >>> k1 != ck1
+    True
+    >>> k1 != other_ckey
+    True
+    >>> other_ckey != ck1
+    True
+
+    Wrapepd key is available as well:
+
+    >>> ck1.wrapped is k1
+    True
+
+    Internal implementation is not optimized for performance!
+    """
+    def __init__(self, wrapped):
+        self.wrapped = wrapped
+
+    def __ne__(self, other):
+        return not self == other  # pylint: disable=unneeded-not
+
+    def _dump(self):
+        return OpenSSL.crypto.dump_privatekey(
+            OpenSSL.crypto.FILETYPE_ASN1, self.wrapped)
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return NotImplemented
+        # pylint: disable=protected-access
+        return self._dump() == other._dump()
 
 
 def detect_and_log_mismatch(names, existing, requested, log_data=lambda x: x):
@@ -328,15 +387,16 @@ class OpenSSLIOPlugin(IOPlugin):  # pylint: disable=abstract-method
 
     def load_key(self, data):
         """Load private key."""
-        return OpenSSL.crypto.load_privatekey(self.typ, data)
+        return ComparablePKey(OpenSSL.crypto.load_privatekey(self.typ, data))
 
     def dump_key(self, data):
         """Dump private key."""
-        return OpenSSL.crypto.dump_privatekey(self.typ, data).strip()
+        return OpenSSL.crypto.dump_privatekey(self.typ, data.wrapped).strip()
 
     def load_cert(self, data):
         """Load certificate."""
-        return load_cert(self.typ, data)
+        return jose.ComparableX509(OpenSSL.crypto.load_certificate(
+            self.typ, data))
 
     def dump_cert(self, data):
         """Dump certificate."""
@@ -998,8 +1058,8 @@ def new_data(args, existing):
         key = existing.key
     else:
         logger.info('Generating new certificate private key')
-        key = gen_pkey(args.cert_key_size)
-    csr = gen_csr(key, [vhost.name.encode() for vhost in args.vhosts])
+        key = ComparablePKey(gen_pkey(args.cert_key_size))
+    csr = gen_csr(key.wrapped, [vhost.name.encode() for vhost in args.vhosts])
     certr = get_certr(client, csr, authorizations)
     persist_data(args, IOPlugin.Data(
         account_key=client.key, key=key,
