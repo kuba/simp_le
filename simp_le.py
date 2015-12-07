@@ -404,7 +404,7 @@ class OpenSSLIOPlugin(IOPlugin):  # pylint: disable=abstract-method
         return OpenSSL.crypto.dump_certificate(self.typ, data._wrapped).strip()
 
 
-@IOPlugin.register(path='external_pem.sh', typ=OpenSSL.crypto.FILETYPE_PEM)
+@IOPlugin.register(path='external.sh', typ=OpenSSL.crypto.FILETYPE_PEM)
 class ExternalIOPlugin(OpenSSLIOPlugin, JWKIOPlugin):
     """External IO Plugin.
 
