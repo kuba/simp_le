@@ -575,6 +575,31 @@ class CertFile(FileIOPlugin, OpenSSLIOPlugin):
         return self.save_to_file(self.dump_cert(data.cert))
 
 
+@IOPlugin.register(path='full.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
+@IOPlugin.register(path='full.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
+class FullFile(FileIOPlugin, OpenSSLIOPlugin):
+    """Private key, certificate and chain plugin."""
+
+    _SEP = b'\n\n'  # TODO: do all webservers like this?
+
+    def persisted(self):
+        return self.Data(account_key=False, key=True, cert=True, chain=True)
+
+    def load_from_content(self, content):
+        parts = content.split(self._SEP)
+        return self.Data(
+            account_key=None,
+            key=self.load_key(parts[0]),
+            cert=self.load_cert(parts[1]),
+            chain=[self.load_cert(cert) for cert in parts[2:]],
+        )
+
+    def save(self, data):
+        parts = [self.dump_key(data.key), self.dump_cert(data.cert)]
+        parts.extend([self.dump_cert(cert) for cert in data.chain])
+        self.save_to_file(self._SEP.join(parts))
+
+
 def create_parser():
     """Create argument parser."""
     parser = argparse.ArgumentParser(
