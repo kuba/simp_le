@@ -8,6 +8,15 @@ bootstrap_deb () {
     apt-get install -y --no-install-recommends "$@"
   }
 
+  # virtualenv binary can be found in different packages depending on
+  # distro version
+  package="python-virtualenv"
+
+  if ! apt-cache show -qq "${package}" > /dev/null 2>&1
+  then
+  	package="virtualenv"
+  fi
+
   install \
     ca-certificates \
     gcc \
@@ -15,11 +24,7 @@ bootstrap_deb () {
     libffi-dev \
     python \
     python-dev \
-    python-virtualenv
-
-  # virtualenv binary can be found in different packages depending on
-  # distro version
-  install virtualenv || true
+    "${package}"
 }
 
 bootstrap_rpm () {
