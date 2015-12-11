@@ -238,7 +238,7 @@ class IOPlugin(object):
     Unless otherwise stated, plugin data components are typically
     filled with the following data:
 
-    - for `account_key`: private accoutn key, an instance of `acme.jose.JWK`
+    - for `account_key`: private account key, an instance of `acme.jose.JWK`
     - for `key`: private key, an instance of `OpenSSL.crypto.PKey`
     - for `cert`: certificate, an instance of `OpenSSL.crypto.X509`
     - for `chain`: certificate chain, a list of `OpenSSL.crypto.X509` instances
