@@ -10,11 +10,11 @@ bootstrap_deb () {
 
   # virtualenv binary can be found in different packages depending on
   # distro version
-  package="python-virtualenv"
+  package="virtualenv"
 
   if ! apt-cache show -qq "${package}" > /dev/null 2>&1
   then
-  	package="virtualenv"
+  	package="python-virtualenv"
   fi
 
   install \
