@@ -1,6 +1,8 @@
 #!/bin/sh
-# Dummy example external script that loads/saves key/cert/chain to
-# /tmp/foo; `simp_le -f external_pem.sh`.
+#
+# Dummy example external script that loads/saves
+# account_key/key/cert/chain to /tmp/foo; Usage: `simp_le -f
+# external.sh`.
 
 load () {
   cat /tmp/foo
@@ -11,7 +13,7 @@ save () {
 }
 
 persisted () {
-  echo key cert chain
+  echo account_key key cert chain
 }
 
 case $1 in

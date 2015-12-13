@@ -13,7 +13,7 @@
 *.pem
 *.der
 # ... as well as external IO plugin script
-/external_pem.sh
+/external.sh
 
 # `sshfs user@host:$ROOT public_html/` and `--default_root=public_html`
 /public_html/
