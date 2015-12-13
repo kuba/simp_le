@@ -4,27 +4,21 @@
 bootstrap_deb () {
   apt-get update
 
-  install () {
-    apt-get install -y --no-install-recommends "$@"
-  }
-
   # virtualenv binary can be found in different packages depending on
   # distro version
-  package="virtualenv"
-
-  if ! apt-cache show -qq "${package}" > /dev/null 2>&1
-  then
-  	package="python-virtualenv"
+  virtualenv_bin_pkg="virtualenv"
+  if ! apt-cache show -qq "${virtualenv_bin_pkg}" >/dev/null 2>&1; then
+    virtualenv_bin_pkg="python-virtualenv"
   fi
 
-  install \
+  apt-get install -y --no-install-recommends \
     ca-certificates \
     gcc \
     libssl-dev \
     libffi-dev \
     python \
     python-dev \
-    "${package}"
+    "${virtualenv_bin_pkg}"
 }
 
 bootstrap_rpm () {
