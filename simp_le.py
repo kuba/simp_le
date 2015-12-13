@@ -985,8 +985,7 @@ def registered_client(args, existing_account_key):
             logger.debug('TOS hash: %s', tos_hash)
             if args.tos_sha256 != tos_hash:
                 raise Error('TOS hash mismatch. Found: %s.' % tos_hash)
-            client.update_registration(regr.update(
-                body=regr.body.update(agreement=regr.terms_of_service)))
+            client.agree_to_tos(regr)
 
     return client
 
