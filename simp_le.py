@@ -28,8 +28,10 @@ import errno
 import logging
 import os
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import traceback
 import unittest
@@ -433,8 +435,8 @@ class ExternalIOPlugin(OpenSSLIOPlugin, JWKIOPlugin):
 
     @property
     def script(self):
-        """Relative path to the script."""
-        return './' + self.path
+        """Path to the script."""
+        return os.path.join('.', self.path)
 
     def get_output_or_fail(self, command):
         """Get output or throw an exception in case of errors."""
@@ -449,17 +451,28 @@ class ExternalIOPlugin(OpenSSLIOPlugin, JWKIOPlugin):
         """Call the external script and see which data is persisted."""
         output = self.get_output_or_fail('persisted').split()
         return self.Data(
-            account_key=('account_key' in output),
-            key=('key' in output),
-            cert=('cert' in output),
-            chain=('chain' in output),
+            account_key=(b'account_key' in output),
+            key=(b'key' in output),
+            cert=(b'cert' in output),
+            chain=(b'chain' in output),
         )
 
     def load(self):
         """Call the external script to retrieve persisted data."""
         output = self.get_output_or_fail('load').split(self._SEP)
-        # Do NOT log `output` as it contains key material
+        # Do NOT log `output` as it might contain secret material (in
+        # case key is persisted)
+
         persisted = self.persisted()
+        expected_count = len([comp for comp in persisted if comp])
+        if output == [b'']:
+            # no previously persisted data; NB `b''.split(b'\n\n') == [b'']`
+            return self.EMPTY_DATA
+        elif expected_count != len(output):
+            raise Error(
+                'Expected %d components (%r) from external plugin, %d '
+                'received. ' % (expected_count, persisted, len(output)))
+
         account_key = self.load_jwk(
             output.pop(0)) if persisted.account_key else None
         key = self.load_key(output.pop(0)) if persisted.key else None
@@ -493,11 +506,71 @@ class ExternalIOPlugin(OpenSSLIOPlugin, JWKIOPlugin):
             raise Error(
                 'There was a problem executing external IO plugin script')
         stdout, stderr = proc.communicate(self._SEP.join(output))
-        logger.debug(stdout)
-        logger.error(stderr)
-        if not proc.wait():
-            raise Error('External script exited with non-zero code: %d',
+        if stdout is not None:
+            logger.debug('STDOUT: %s', stdout)
+        if stderr is not None:
+            logger.error('STDERR: %s', stderr)
+        if proc.wait():
+            raise Error('External script exited with non-zero code: %d' %
                         proc.returncode)
+
+
+class ExternalIOPluginTest(TestCase):
+    """Tests for ExternalIOPlugin."""
+
+    # this is unittest suite | pylint: disable=missing-docstring
+
+    def setUp(self):
+        self.root = tempfile.mkdtemp()
+        self.path = os.path.join(self.root, 'external.sh')
+        self.plugin = ExternalIOPlugin(path=self.path)
+        self.key_data = IOPlugin.Data(
+            account_key=None, cert=None, chain=None,
+            key=ComparablePKey(gen_pkey(1024)))
+
+    def tearDown(self):
+        shutil.rmtree(self.root)
+
+    def save_script(self, contents):
+        with open(self.path, 'w') as external_plugin_file:
+            external_plugin_file.write(contents)
+        os.chmod(self.path, 0o700)
+
+    def test_no_persisted_empty(self):
+        self.save_script('#!/bin/sh')
+        self.assertEqual(IOPlugin.EMPTY_DATA, self.plugin.load())
+
+    def test_missing_path_raises_error(self):
+        self.assertRaises(Error, self.plugin.load)
+
+    def test_non_zero_exit_raises_error(self):
+        self.save_script('#!/bin/sh\nfalse')
+        self.assertRaises(Error, self.plugin.load)
+
+    def test_unexpected_load_data(self):
+        self.save_script("""\
+#!/bin/sh
+case $1 in load) echo x;; persisted) ;; esac""")
+        self.assertRaises(Error, self.plugin.load)
+
+    def test_it(self):
+        key_path = os.path.join(self.root, 'key.pem')
+        self.save_script("""\
+#!/bin/sh
+case $1 in
+  save) cat - > {key_path};;
+  load) cat {key_path} || true;;
+  persisted) echo key;;
+esac
+""".format(key_path=key_path))
+
+        # not yet persisted
+        self.assertEqual(IOPlugin.EMPTY_DATA, self.plugin.load())
+        # save some data
+        self.plugin.save(self.key_data)
+        self.assertTrue(os.path.exists(key_path))
+        # loading should return the persisted data back in
+        self.assertEqual(self.key_data, self.plugin.load())
 
 
 @IOPlugin.register(path='chain.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
