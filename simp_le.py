@@ -553,9 +553,13 @@ class ExternalIOPluginTest(TestCase):
     def test_missing_path_raises_error(self):
         self.assertRaises(Error, self.plugin.load)
 
-    def test_non_zero_exit_raises_error(self):
+    def test_load_nonzero_raises_error(self):
         self.save_script('#!/bin/sh\nfalse')
         self.assertRaises(Error, self.plugin.load)
+
+    def test_save_nonzero_raises_error(self):
+        self.save_script('#!/bin/sh\nfalse')
+        self.assertRaises(Error, self.plugin.save, self.key_data)
 
     def test_unexpected_load_data(self):
         self.save_script("""\
