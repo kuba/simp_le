@@ -525,21 +525,58 @@ class ExternalIOPlugin(OpenSSLIOPlugin, JWKIOPlugin):
                         proc.returncode)
 
 
-class ExternalIOPluginTest(TestCase):
-    """Tests for ExternalIOPlugin."""
-
+class PluginIOTestMixin(object):
+    """Common plugins tests."""
     # this is unittest suite | pylint: disable=missing-docstring
 
-    def setUp(self):
-        self.root = tempfile.mkdtemp()
-        self.path = os.path.join(self.root, 'external.sh')
-        self.plugin = ExternalIOPlugin(path=self.path)
-        self.key_data = IOPlugin.Data(
-            account_key=None, cert=None, chain=None,
-            key=ComparablePKey(gen_pkey(1024)))
+    PLUGIN_CLS = NotImplemented
 
-    def tearDown(self):
+    def __init__(self, *args, **kwargs):
+        super(PluginIOTestMixin, self).__init__(*args, **kwargs)
+
+        raw_key = gen_pkey(1024)
+        self.all_data = IOPlugin.Data(
+            account_key=jose.JWKRSA(key=rsa.generate_private_key(
+                public_exponent=65537, key_size=1024,
+                backend=default_backend(),
+            )),
+            key=ComparablePKey(raw_key),
+            cert=jose.ComparableX509(crypto_util.gen_ss_cert(raw_key, ['a'])),
+            chain=[
+                jose.ComparableX509(crypto_util.gen_ss_cert(raw_key, ['b'])),
+                jose.ComparableX509(crypto_util.gen_ss_cert(raw_key, ['c'])),
+            ],
+        )
+        self.key_data = IOPlugin.EMPTY_DATA._replace(key=self.all_data.key)
+
+    def setUp(self):  # pylint: disable=invalid-name
+        self.root = tempfile.mkdtemp()
+        self.path = os.path.join(self.root, 'plugin')
+        # pylint: disable=not-callable
+        self.plugin = self.PLUGIN_CLS(path=self.path)
+
+    def tearDown(self):  # pylint: disable=invalid-name
         shutil.rmtree(self.root)
+
+
+class FileIOPluginTestMixin(PluginIOTestMixin):
+    """Common FileIO plugins tests."""
+    # this is unittest suite | pylint: disable=missing-docstring
+
+    def test_empty(self):
+        self.assertEqual(IOPlugin.EMPTY_DATA, self.plugin.load())
+
+    def test_save_ignore_unpersisted(self):
+        self.plugin.save(self.all_data)
+        self.assertEqual(self.plugin.load(), IOPlugin.Data(
+            *(data if persist else None for persist, data in
+              zip(self.plugin.persisted(), self.all_data))))
+
+
+class ExternalIOPluginTest(PluginIOTestMixin, TestCase):
+    """Tests for ExternalIOPlugin."""
+    # this is unittest suite | pylint: disable=missing-docstring
+    PLUGIN_CLS = ExternalIOPlugin
 
     def save_script(self, contents):
         with open(self.path, 'w') as external_plugin_file:
@@ -607,6 +644,12 @@ class ChainFile(FileIOPlugin, OpenSSLIOPlugin):
             self.dump_cert(chain_cert) for chain_cert in data.chain))
 
 
+class ChainFileTest(FileIOPluginTestMixin, TestCase):
+    """Tests for ChainFile."""
+    # this is unittest suite | pylint: disable=missing-docstring
+    PLUGIN_CLS = ChainFile
+
+
 @IOPlugin.register(path='fullchain.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='fullchain.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
 class FullChainFile(ChainFile):
@@ -630,6 +673,12 @@ class FullChainFile(ChainFile):
             cert=None, chain=([data.cert] + data.chain)))
 
 
+class FullChainFileTest(FileIOPluginTestMixin, TestCase):
+    """Tests for FullChainFile."""
+    # this is unittest suite | pylint: disable=missing-docstring
+    PLUGIN_CLS = FullChainFile
+
+
 @IOPlugin.register(path='key.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='key.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
 class KeyFile(FileIOPlugin, OpenSSLIOPlugin):
@@ -646,6 +695,12 @@ class KeyFile(FileIOPlugin, OpenSSLIOPlugin):
         return self.save_to_file(self.dump_key(data.key))
 
 
+class KeyFileTest(FileIOPluginTestMixin, TestCase):
+    """Tests for KeyFile."""
+    # this is unittest suite | pylint: disable=missing-docstring
+    PLUGIN_CLS = KeyFile
+
+
 @IOPlugin.register(path='cert.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='cert.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
 class CertFile(FileIOPlugin, OpenSSLIOPlugin):
@@ -660,6 +715,12 @@ class CertFile(FileIOPlugin, OpenSSLIOPlugin):
 
     def save(self, data):
         return self.save_to_file(self.dump_cert(data.cert))
+
+
+class CertFileTest(FileIOPluginTestMixin, TestCase):
+    """Tests for CertFile."""
+    # this is unittest suite | pylint: disable=missing-docstring
+    PLUGIN_CLS = CertFile
 
 
 def create_parser():
@@ -1038,7 +1099,7 @@ def check_or_generate_account_key(args, existing):
         return jose.JWKRSA(key=rsa.generate_private_key(
             public_exponent=args.account_key_public_exponent,
             key_size=args.account_key_size,
-            backend=default_backend()
+            backend=default_backend(),
         ))
 
     mismatch = False
