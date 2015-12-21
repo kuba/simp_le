@@ -69,7 +69,7 @@ Installation
 
     sudo ./bootstrap.sh
     ./venv.sh
-    . venv/bin/activate
+    export PATH=./venv/bin:$PATH
 
 Help
 ----

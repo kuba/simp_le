@@ -1,7 +1,7 @@
 #!/bin/sh
 
 virtualenv --no-site-packages venv
-. ./venv/bin/activate
+export PATH=./venv/bin:$PATH  # #49, activate script requires bash
 for pkg in setuptools pip wheel
 do
   pip install -U "${pkg?}"
