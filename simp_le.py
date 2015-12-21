@@ -441,11 +441,21 @@ class ExternalIOPlugin(OpenSSLIOPlugin, JWKIOPlugin):
     def get_output_or_fail(self, command):
         """Get output or throw an exception in case of errors."""
         try:
-            return subprocess.check_output([self.script, command])
+            proc = subprocess.Popen(
+                [self.script, command], stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE)
         except (OSError, subprocess.CalledProcessError) as error:
             logger.exception(error)
             raise Error(
                 'There was a problem executing external IO plugin script')
+
+        stdout, stderr = proc.communicate()
+        if stderr is not None:
+            logger.error('STDERR: %s', stderr)
+        if proc.wait():
+            raise Error('External script exited with non-zero code: %d' %
+                        proc.returncode)
+        return stdout
 
     def persisted(self):
         """Call the external script and see which data is persisted."""
