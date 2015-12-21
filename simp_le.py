@@ -28,8 +28,10 @@ import errno
 import logging
 import os
 import shlex
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import traceback
 import unittest
@@ -238,7 +240,7 @@ class IOPlugin(object):
     Unless otherwise stated, plugin data components are typically
     filled with the following data:
 
-    - for `account_key`: private accoutn key, an instance of `acme.jose.JWK`
+    - for `account_key`: private account key, an instance of `acme.jose.JWK`
     - for `key`: private key, an instance of `OpenSSL.crypto.PKey`
     - for `cert`: certificate, an instance of `OpenSSL.crypto.X509`
     - for `chain`: certificate chain, a list of `OpenSSL.crypto.X509` instances
@@ -404,7 +406,7 @@ class OpenSSLIOPlugin(IOPlugin):  # pylint: disable=abstract-method
         return OpenSSL.crypto.dump_certificate(self.typ, data._wrapped).strip()
 
 
-@IOPlugin.register(path='external_pem.sh', typ=OpenSSL.crypto.FILETYPE_PEM)
+@IOPlugin.register(path='external.sh', typ=OpenSSL.crypto.FILETYPE_PEM)
 class ExternalIOPlugin(OpenSSLIOPlugin, JWKIOPlugin):
     """External IO Plugin.
 
@@ -433,33 +435,54 @@ class ExternalIOPlugin(OpenSSLIOPlugin, JWKIOPlugin):
 
     @property
     def script(self):
-        """Relative path to the script."""
-        return './' + self.path
+        """Path to the script."""
+        return os.path.join('.', self.path)
 
     def get_output_or_fail(self, command):
         """Get output or throw an exception in case of errors."""
         try:
-            return subprocess.check_output([self.script, command])
+            proc = subprocess.Popen(
+                [self.script, command], stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE)
         except (OSError, subprocess.CalledProcessError) as error:
             logger.exception(error)
             raise Error(
                 'There was a problem executing external IO plugin script')
 
+        stdout, stderr = proc.communicate()
+        if stderr is not None:
+            logger.error('STDERR: %s', stderr)
+        if proc.wait():
+            raise Error('External script exited with non-zero code: %d' %
+                        proc.returncode)
+        return stdout
+
     def persisted(self):
         """Call the external script and see which data is persisted."""
         output = self.get_output_or_fail('persisted').split()
         return self.Data(
-            account_key=('account_key' in output),
-            key=('key' in output),
-            cert=('cert' in output),
-            chain=('chain' in output),
+            account_key=(b'account_key' in output),
+            key=(b'key' in output),
+            cert=(b'cert' in output),
+            chain=(b'chain' in output),
         )
 
     def load(self):
         """Call the external script to retrieve persisted data."""
         output = self.get_output_or_fail('load').split(self._SEP)
-        # Do NOT log `output` as it contains key material
+        # Do NOT log `output` as it might contain secret material (in
+        # case key is persisted)
+
         persisted = self.persisted()
+        expected_count = len([comp for comp in persisted if comp])
+        if output == [b'']:
+            # no previously persisted data; NB `b''.split(b'\n\n') == [b'']`
+            return self.EMPTY_DATA
+        elif expected_count != len(output):
+            raise Error(
+                'Expected %d components (%r) from external plugin, %d '
+                'received. ' % (expected_count, persisted, len(output)))
+
         account_key = self.load_jwk(
             output.pop(0)) if persisted.account_key else None
         key = self.load_key(output.pop(0)) if persisted.key else None
@@ -493,11 +516,112 @@ class ExternalIOPlugin(OpenSSLIOPlugin, JWKIOPlugin):
             raise Error(
                 'There was a problem executing external IO plugin script')
         stdout, stderr = proc.communicate(self._SEP.join(output))
-        logger.debug(stdout)
-        logger.error(stderr)
-        if not proc.wait():
-            raise Error('External script exited with non-zero code: %d',
+        if stdout is not None:
+            logger.debug('STDOUT: %s', stdout)
+        if stderr is not None:
+            logger.error('STDERR: %s', stderr)
+        if proc.wait():
+            raise Error('External script exited with non-zero code: %d' %
                         proc.returncode)
+
+
+class PluginIOTestMixin(object):
+    """Common plugins tests."""
+    # this is unittest suite | pylint: disable=missing-docstring
+
+    PLUGIN_CLS = NotImplemented
+
+    def __init__(self, *args, **kwargs):
+        super(PluginIOTestMixin, self).__init__(*args, **kwargs)
+
+        raw_key = gen_pkey(1024)
+        self.all_data = IOPlugin.Data(
+            account_key=jose.JWKRSA(key=rsa.generate_private_key(
+                public_exponent=65537, key_size=1024,
+                backend=default_backend(),
+            )),
+            key=ComparablePKey(raw_key),
+            cert=jose.ComparableX509(crypto_util.gen_ss_cert(raw_key, ['a'])),
+            chain=[
+                jose.ComparableX509(crypto_util.gen_ss_cert(raw_key, ['b'])),
+                jose.ComparableX509(crypto_util.gen_ss_cert(raw_key, ['c'])),
+            ],
+        )
+        self.key_data = IOPlugin.EMPTY_DATA._replace(key=self.all_data.key)
+
+    def setUp(self):  # pylint: disable=invalid-name
+        self.root = tempfile.mkdtemp()
+        self.path = os.path.join(self.root, 'plugin')
+        # pylint: disable=not-callable
+        self.plugin = self.PLUGIN_CLS(path=self.path)
+
+    def tearDown(self):  # pylint: disable=invalid-name
+        shutil.rmtree(self.root)
+
+
+class FileIOPluginTestMixin(PluginIOTestMixin):
+    """Common FileIO plugins tests."""
+    # this is unittest suite | pylint: disable=missing-docstring
+
+    def test_empty(self):
+        self.assertEqual(IOPlugin.EMPTY_DATA, self.plugin.load())
+
+    def test_save_ignore_unpersisted(self):
+        self.plugin.save(self.all_data)
+        self.assertEqual(self.plugin.load(), IOPlugin.Data(
+            *(data if persist else None for persist, data in
+              zip(self.plugin.persisted(), self.all_data))))
+
+
+class ExternalIOPluginTest(PluginIOTestMixin, TestCase):
+    """Tests for ExternalIOPlugin."""
+    # this is unittest suite | pylint: disable=missing-docstring
+    PLUGIN_CLS = ExternalIOPlugin
+
+    def save_script(self, contents):
+        with open(self.path, 'w') as external_plugin_file:
+            external_plugin_file.write(contents)
+        os.chmod(self.path, 0o700)
+
+    def test_no_persisted_empty(self):
+        self.save_script('#!/bin/sh')
+        self.assertEqual(IOPlugin.EMPTY_DATA, self.plugin.load())
+
+    def test_missing_path_raises_error(self):
+        self.assertRaises(Error, self.plugin.load)
+
+    def test_load_nonzero_raises_error(self):
+        self.save_script('#!/bin/sh\nfalse')
+        self.assertRaises(Error, self.plugin.load)
+
+    def test_save_nonzero_raises_error(self):
+        self.save_script('#!/bin/sh\nfalse')
+        self.assertRaises(Error, self.plugin.save, self.key_data)
+
+    def test_unexpected_load_data(self):
+        self.save_script("""\
+#!/bin/sh
+case $1 in load) echo x;; persisted) ;; esac""")
+        self.assertRaises(Error, self.plugin.load)
+
+    def test_it(self):
+        key_path = os.path.join(self.root, 'key.pem')
+        self.save_script("""\
+#!/bin/sh
+case $1 in
+  save) cat - > {key_path};;
+  load) cat {key_path} || true;;
+  persisted) echo key;;
+esac
+""".format(key_path=key_path))
+
+        # not yet persisted
+        self.assertEqual(IOPlugin.EMPTY_DATA, self.plugin.load())
+        # save some data
+        self.plugin.save(self.key_data)
+        self.assertTrue(os.path.exists(key_path))
+        # loading should return the persisted data back in
+        self.assertEqual(self.key_data, self.plugin.load())
 
 
 @IOPlugin.register(path='chain.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
@@ -518,6 +642,12 @@ class ChainFile(FileIOPlugin, OpenSSLIOPlugin):
     def save(self, data):
         return self.save_to_file(self._SEP.join(
             self.dump_cert(chain_cert) for chain_cert in data.chain))
+
+
+class ChainFileTest(FileIOPluginTestMixin, TestCase):
+    """Tests for ChainFile."""
+    # this is unittest suite | pylint: disable=missing-docstring
+    PLUGIN_CLS = ChainFile
 
 
 @IOPlugin.register(path='fullchain.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
@@ -543,6 +673,12 @@ class FullChainFile(ChainFile):
             cert=None, chain=([data.cert] + data.chain)))
 
 
+class FullChainFileTest(FileIOPluginTestMixin, TestCase):
+    """Tests for FullChainFile."""
+    # this is unittest suite | pylint: disable=missing-docstring
+    PLUGIN_CLS = FullChainFile
+
+
 @IOPlugin.register(path='key.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='key.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
 class KeyFile(FileIOPlugin, OpenSSLIOPlugin):
@@ -559,6 +695,12 @@ class KeyFile(FileIOPlugin, OpenSSLIOPlugin):
         return self.save_to_file(self.dump_key(data.key))
 
 
+class KeyFileTest(FileIOPluginTestMixin, TestCase):
+    """Tests for KeyFile."""
+    # this is unittest suite | pylint: disable=missing-docstring
+    PLUGIN_CLS = KeyFile
+
+
 @IOPlugin.register(path='cert.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='cert.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
 class CertFile(FileIOPlugin, OpenSSLIOPlugin):
@@ -573,6 +715,12 @@ class CertFile(FileIOPlugin, OpenSSLIOPlugin):
 
     def save(self, data):
         return self.save_to_file(self.dump_cert(data.cert))
+
+
+class CertFileTest(FileIOPluginTestMixin, TestCase):
+    """Tests for CertFile."""
+    # this is unittest suite | pylint: disable=missing-docstring
+    PLUGIN_CLS = CertFile
 
 
 @IOPlugin.register(path='full.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
@@ -598,6 +746,12 @@ class FullFile(FileIOPlugin, OpenSSLIOPlugin):
         parts = [self.dump_key(data.key), self.dump_cert(data.cert)]
         parts.extend([self.dump_cert(cert) for cert in data.chain])
         self.save_to_file(self._SEP.join(parts))
+
+
+class FullFileTest(FileIOPluginTestMixin, TestCase):
+    """Tests for FullFile."""
+    # this is unittest suite | pylint: disable=missing-docstring
+    PLUGIN_CLS = FullFile
 
 
 def create_parser():
@@ -976,7 +1130,7 @@ def check_or_generate_account_key(args, existing):
         return jose.JWKRSA(key=rsa.generate_private_key(
             public_exponent=args.account_key_public_exponent,
             key_size=args.account_key_size,
-            backend=default_backend()
+            backend=default_backend(),
         ))
 
     mismatch = False
@@ -1010,8 +1164,7 @@ def registered_client(args, existing_account_key):
             logger.debug('TOS hash: %s', tos_hash)
             if args.tos_sha256 != tos_hash:
                 raise Error('TOS hash mismatch. Found: %s.' % tos_hash)
-            client.update_registration(regr.update(
-                body=regr.body.update(agreement=regr.terms_of_service)))
+            client.agree_to_tos(regr)
 
     return client
 
