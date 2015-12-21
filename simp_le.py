@@ -744,7 +744,7 @@ class FullFile(FileIOPlugin, OpenSSLIOPlugin):
 
     def save(self, data):
         parts = [self.dump_key(data.key), self.dump_cert(data.cert)]
-        parts.extend([self.dump_cert(cert) for cert in data.chain])
+        parts.extend(self.dump_cert(cert) for cert in data.chain)
         self.save_to_file(self._SEP.join(parts))
 
 
