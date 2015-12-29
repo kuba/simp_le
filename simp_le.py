@@ -786,6 +786,10 @@ def create_parser():
         '--test', action='store_true', default=False,
         help='Run tests and exit.',
     )
+    modes.add_argument(
+        '--integration_test', action='store_true', default=False,
+        help='Run integration tests and exit.',
+    )
 
     manager = parser.add_argument_group(
         'Webroot manager', description='This client is just a '
@@ -1043,6 +1047,13 @@ def test(args):
     )))
 
 
+def integration_test(args):
+    """Run integration tests (--integration-test)."""
+    return test_suite(
+        args, unittest.defaultTestLoader.loadTestsFromTestCase(
+            IntegrationTests))
+
+
 def check_plugins_persist_all(ioplugins):
     """Do plugins cover all components (key/cert/chain)?"""
     persisted = IOPlugin.Data(
@@ -1296,6 +1307,8 @@ def main_with_exceptions(cli_args):
 
     if args.test:  # --test
         return test(args)
+    if args.integration_test:  # --integration_test
+        return integration_test(args)
 
     setup_logging(args.verbose)
     logger.debug('%r parsed as %r', cli_args, args)
@@ -1377,6 +1390,55 @@ class MainTest(UnitTestCase):
                 # assertRaises in 2.6 is not context manager, we need
                 # a way to check that this code path is not reachable
                 assert False
+
+
+@contextlib.contextmanager
+def chdir(path):
+    """Context manager that adjusts CWD."""
+    cwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(cwd)
+
+
+class IntegrationTests(unittest.TestCase):
+    """Integrations tests with Boulder.
+
+    Prerequisites:
+    - /etc/hosts:127.0.0.1 le.wtf
+    - Boulder running on localhost:4000
+    - Boulder verifying http-01 on port 5002
+    """
+    # this is a test suite | pylint: disable=missing-docstring
+
+    SERVER = 'http://localhost:4000/directory'
+    TOS_SHA256 = ('3ae9d8149e59b8845069552fdae761c3'
+                  'a042fc5ede1fcdf8f37f7aa4707c4d6e')
+    PORT = 5002
+
+    @classmethod
+    def _run(cls, cmdline):
+        return main(shlex.split(cmdline))
+
+    @classmethod
+    @contextlib.contextmanager
+    def _new_swd(cls):
+        path = tempfile.mkdtemp()
+        try:
+            with chdir(path):
+                yield path
+        finally:
+            shutil.rmtree(path)
+
+    def test_it(self):
+        with self._new_swd():
+            self._run('--server %s --tos_sha256 %s -f account_key.json '
+                      '-f key.pem -f full.pem -d le.wtf:public_html' % (
+                          self.SERVER, self.TOS_SHA256))
+            self._run('--server %s --revoke -f account_key.json -f full.pem' %
+                      self.SERVER)
 
 
 if __name__ == '__main__':

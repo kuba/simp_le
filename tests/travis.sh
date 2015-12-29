@@ -7,7 +7,6 @@
 set -xe
 
 SERVER=http://localhost:4000/directory
-TOS_SHA256=3ae9d8149e59b8845069552fdae761c3a042fc5ede1fcdf8f37f7aa4707c4d6e
 PORT=5002
 
 integration_install() {
@@ -48,12 +47,7 @@ integration_install() {
 integration_script() {
   . .tox/$TOXENV/bin/activate
   pip -V
-
-  simp_le -v --server ${SERVER?} --tos_sha256 ${TOS_SHA256?} \
-    -f account_key.json -f key.pem -f cert.pem -f fullchain.pem \
-    -d le.wtf:public_html
-
-  simp_le -v --server ${SERVER?} --revoke -f account_key.json -f cert.pem
+  simp_le -v --integration_test
 }
 
 if [ "py${TOXENV#py}" = "${TOXENV}" ]; then
