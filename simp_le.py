@@ -21,6 +21,7 @@
 import abc
 import argparse
 import collections
+import contextlib
 import datetime
 import doctest
 import hashlib
@@ -76,7 +77,7 @@ class Error(Exception):
     """simp_le error."""
 
 
-class TestCase(unittest.TestCase):
+class UnitTestCase(unittest.TestCase):
     """simp_le unit test case."""
 
 
@@ -527,7 +528,7 @@ class ExternalIOPlugin(OpenSSLIOPlugin, JWKIOPlugin):
 
 class PluginIOTestMixin(object):
     """Common plugins tests."""
-    # this is unittest suite | pylint: disable=missing-docstring
+    # this is a test suite | pylint: disable=missing-docstring
 
     PLUGIN_CLS = NotImplemented
 
@@ -561,7 +562,7 @@ class PluginIOTestMixin(object):
 
 class FileIOPluginTestMixin(PluginIOTestMixin):
     """Common FileIO plugins tests."""
-    # this is unittest suite | pylint: disable=missing-docstring
+    # this is a test suite | pylint: disable=missing-docstring
 
     def test_empty(self):
         self.assertEqual(IOPlugin.EMPTY_DATA, self.plugin.load())
@@ -573,9 +574,9 @@ class FileIOPluginTestMixin(PluginIOTestMixin):
               zip(self.plugin.persisted(), self.all_data))))
 
 
-class ExternalIOPluginTest(PluginIOTestMixin, TestCase):
+class ExternalIOPluginTest(PluginIOTestMixin, UnitTestCase):
     """Tests for ExternalIOPlugin."""
-    # this is unittest suite | pylint: disable=missing-docstring
+    # this is a test suite | pylint: disable=missing-docstring
     PLUGIN_CLS = ExternalIOPlugin
 
     def save_script(self, contents):
@@ -644,9 +645,9 @@ class ChainFile(FileIOPlugin, OpenSSLIOPlugin):
             self.dump_cert(chain_cert) for chain_cert in data.chain))
 
 
-class ChainFileTest(FileIOPluginTestMixin, TestCase):
+class ChainFileTest(FileIOPluginTestMixin, UnitTestCase):
     """Tests for ChainFile."""
-    # this is unittest suite | pylint: disable=missing-docstring
+    # this is a test suite | pylint: disable=missing-docstring
     PLUGIN_CLS = ChainFile
 
 
@@ -673,9 +674,9 @@ class FullChainFile(ChainFile):
             cert=None, chain=([data.cert] + data.chain)))
 
 
-class FullChainFileTest(FileIOPluginTestMixin, TestCase):
+class FullChainFileTest(FileIOPluginTestMixin, UnitTestCase):
     """Tests for FullChainFile."""
-    # this is unittest suite | pylint: disable=missing-docstring
+    # this is a test suite | pylint: disable=missing-docstring
     PLUGIN_CLS = FullChainFile
 
 
@@ -695,9 +696,9 @@ class KeyFile(FileIOPlugin, OpenSSLIOPlugin):
         return self.save_to_file(self.dump_key(data.key))
 
 
-class KeyFileTest(FileIOPluginTestMixin, TestCase):
+class KeyFileTest(FileIOPluginTestMixin, UnitTestCase):
     """Tests for KeyFile."""
-    # this is unittest suite | pylint: disable=missing-docstring
+    # this is a test suite | pylint: disable=missing-docstring
     PLUGIN_CLS = KeyFile
 
 
@@ -717,9 +718,9 @@ class CertFile(FileIOPlugin, OpenSSLIOPlugin):
         return self.save_to_file(self.dump_cert(data.cert))
 
 
-class CertFileTest(FileIOPluginTestMixin, TestCase):
+class CertFileTest(FileIOPluginTestMixin, UnitTestCase):
     """Tests for CertFile."""
-    # this is unittest suite | pylint: disable=missing-docstring
+    # this is a test suite | pylint: disable=missing-docstring
     PLUGIN_CLS = CertFile
 
 
@@ -748,9 +749,9 @@ class FullFile(FileIOPlugin, OpenSSLIOPlugin):
         self.save_to_file(self._SEP.join(parts))
 
 
-class FullFileTest(FileIOPluginTestMixin, TestCase):
+class FullFileTest(FileIOPluginTestMixin, UnitTestCase):
     """Tests for FullFile."""
-    # this is unittest suite | pylint: disable=missing-docstring
+    # this is a test suite | pylint: disable=missing-docstring
     PLUGIN_CLS = FullFile
 
 
@@ -1013,16 +1014,33 @@ def renewal_necessary(cert, valid_min):
     return diff < datetime.timedelta(seconds=valid_min)
 
 
-def test(args):
-    """Run tests (--test)."""
-    suite = unittest.TestSuite((
-        doctest.DocTestSuite(optionflags=(
-            doctest.ELLIPSIS | doctest.IGNORE_EXCEPTION_DETAIL)),
-        unittest.defaultTestLoader.loadTestsFromName(__name__)
-    ))
+class TestLoader(unittest.TestLoader):
+    """simp_le test loader."""
+
+    def load_tests_from_subclass(self, subcls):
+        """Load tests which subclass from specific test case class."""
+        module = __import__(__name__)
+        return self.suiteClass([
+            self.loadTestsFromTestCase(getattr(module, attr))
+            for attr in dir(module)
+            if isinstance(getattr(module, attr), type) and
+            issubclass(getattr(module, attr), subcls)])
+
+
+def test_suite(args, suite):
+    """Run a specific test suite."""
     return EXIT_TESTS_OK if unittest.TextTestRunner(
         verbosity=(2 if args.verbose else 1)).run(
             suite).wasSuccessful() else EXIT_ERROR
+
+
+def test(args):
+    """Run tests (--test)."""
+    return test_suite(args, unittest.TestSuite((
+        TestLoader().load_tests_from_subclass(UnitTestCase),
+        doctest.DocTestSuite(optionflags=(
+            doctest.ELLIPSIS | doctest.IGNORE_EXCEPTION_DETAIL)),
+    )))
 
 
 def check_plugins_persist_all(ioplugins):
@@ -1322,10 +1340,10 @@ def main(cli_args=sys.argv[1:]):
         exit_with_error('\nUnhandled error has happened, traceback is above')
 
 
-class MainIntegrationTests(TestCase):
-    """Integration tests for main()."""
+class MainTest(UnitTestCase):
+    """Unit tests for main()."""
 
-    # this is unittest suite | pylint: disable=missing-docstring
+    # this is a test suite | pylint: disable=missing-docstring
 
     @mock.patch('sys.stderr')
     def test_error_exit_codes(self, dummy_stderr):
