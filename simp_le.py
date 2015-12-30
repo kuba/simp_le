@@ -1395,12 +1395,12 @@ class MainTest(UnitTestCase):
 @contextlib.contextmanager
 def chdir(path):
     """Context manager that adjusts CWD."""
-    cwd = os.getcwd()
+    old_path = os.getcwd()
     os.chdir(path)
     try:
-        yield
+        yield old_path
     finally:
-        os.chdir(cwd)
+        os.chdir(old_path)
 
 
 class IntegrationTests(unittest.TestCase):
@@ -1427,16 +1427,17 @@ class IntegrationTests(unittest.TestCase):
     def _new_swd(cls):
         path = tempfile.mkdtemp()
         try:
-            with chdir(path):
-                yield path
+            with chdir(path) as old_path:
+                yield old_path, path
         finally:
             shutil.rmtree(path)
 
     def test_it(self):
+        webroot = os.path.join(os.getcwd(), 'public_html')
         with self._new_swd():
             self._run('--server %s --tos_sha256 %s -f account_key.json '
-                      '-f key.pem -f full.pem -d le.wtf:public_html' % (
-                          self.SERVER, self.TOS_SHA256))
+                      '-f key.pem -f full.pem -d le.wtf:%s' % (
+                          self.SERVER, self.TOS_SHA256, webroot))
             self._run('--server %s --revoke -f account_key.json -f full.pem' %
                       self.SERVER)
 
