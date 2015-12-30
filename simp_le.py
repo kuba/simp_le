@@ -1303,7 +1303,10 @@ def setup_logging(verbose):
 
 def main_with_exceptions(cli_args):
     """Run the script, throw exceptions on error."""
-    args = create_parser().parse_args(cli_args)
+    try:
+        args = create_parser().parse_args(cli_args)
+    except SystemExit:
+        return EXIT_ERROR
 
     if args.test:  # --test
         return test(args)
@@ -1334,23 +1337,24 @@ def exit_with_error(message):
     """Print `message` and debugging tips to STDERR, exit with EXIT_ERROR."""
     sys.stderr.write('%s\n\nDebugging tips: -v improves output verbosity. '
                      'Help is available under --help.\n' % message)
-    raise SystemExit(EXIT_ERROR)
+    return EXIT_ERROR
 
 
 def main(cli_args=sys.argv[1:]):
     """Run the script, with exceptions caught and printed to STDERR."""
     # logging (handler) is not set up yet, use STDERR only!
     try:
-        raise SystemExit(main_with_exceptions(cli_args))
+        return main_with_exceptions(cli_args)
     except Error as error:
-        exit_with_error(error)
+        return exit_with_error(error)
     except messages.Error as error:
-        exit_with_error('ACME server returned an error: %s\n' % error)
-    except Exception as error:  # pylint: disable=broad-except
+        return exit_with_error('ACME server returned an error: %s\n' % error)
+    except BaseException as error:  # pylint: disable=broad-except
         # maintain manifest invariant: `exit 1` iff renewal not
         # necessary, `exit 2` iff error
         traceback.print_exc(file=sys.stderr)
-        exit_with_error('\nUnhandled error has happened, traceback is above')
+        return exit_with_error(
+            '\nUnhandled error has happened, traceback is above')
 
 
 class MainTest(UnitTestCase):
@@ -1382,14 +1386,7 @@ class MainTest(UnitTestCase):
         ]])
 
         for args in test_args:
-            try:
-                main(shlex.split(args))
-            except SystemExit as error:
-                self.assertEqual(EXIT_ERROR, error.code)
-            else:
-                # assertRaises in 2.6 is not context manager, we need
-                # a way to check that this code path is not reachable
-                assert False
+            self.assertEqual(EXIT_ERROR, main(shlex.split(args)))
 
 
 @contextlib.contextmanager
@@ -1419,8 +1416,9 @@ class IntegrationTests(unittest.TestCase):
     PORT = 5002
 
     @classmethod
-    def _run(cls, cmdline):
-        return main(shlex.split(cmdline))
+    def _run(cls, args):
+        logger.debug('Running main with the following args: %s', args)
+        return main(shlex.split(args))
 
     @classmethod
     @contextlib.contextmanager
@@ -1443,4 +1441,4 @@ class IntegrationTests(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())
