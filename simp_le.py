@@ -1430,14 +1430,30 @@ class IntegrationTests(unittest.TestCase):
         finally:
             shutil.rmtree(path)
 
+    @classmethod
+    def get_stats(cls, *paths):
+        return dict((path, os.stat(path)) for path in paths)
+
     def test_it(self):
         webroot = os.path.join(os.getcwd(), 'public_html')
+        args = ('--server %s --tos_sha256 %s -f account_key.json '
+                '-f key.pem -f full.pem -d le.wtf:%s' % (
+                    self.SERVER, self.TOS_SHA256, webroot))
+        files = ('account_key.json', 'key.pem', 'full.pem')
         with self._new_swd():
-            self._run('--server %s --tos_sha256 %s -f account_key.json '
-                      '-f key.pem -f full.pem -d le.wtf:%s' % (
-                          self.SERVER, self.TOS_SHA256, webroot))
-            self._run('--server %s --revoke -f account_key.json -f full.pem' %
-                      self.SERVER)
+            self.assertEqual(EXIT_RENEWAL, self._run(args))
+            initial_stats = self.get_stats(*files)
+
+            self.assertEqual(EXIT_NO_RENEWAL, self._run(args))
+            # No renewal => no files should be touched
+            # NB get_stats() would fail if file didn't exist
+            self.assertEqual(initial_stats, self.get_stats(*files))
+
+            self.assertEqual(EXIT_REVOKE_OK, self._run(
+                '--server %s --revoke -f account_key.json -f full.pem' %
+                self.SERVER))
+            # Revocation shouldn't touch any files
+            self.assertEqual(initial_stats, self.get_stats(*files))
 
 
 if __name__ == '__main__':
