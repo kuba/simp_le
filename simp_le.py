@@ -625,7 +625,6 @@ esac
         self.assertEqual(self.key_data, self.plugin.load())
 
 
-@IOPlugin.register(path='chain.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='chain.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
 class ChainFile(FileIOPlugin, OpenSSLIOPlugin):
     """Certificate chain plugin."""
@@ -651,7 +650,6 @@ class ChainFileTest(FileIOPluginTestMixin, UnitTestCase):
     PLUGIN_CLS = ChainFile
 
 
-@IOPlugin.register(path='fullchain.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='fullchain.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
 class FullChainFile(ChainFile):
     """Full chain file plugin."""
@@ -724,7 +722,6 @@ class CertFileTest(FileIOPluginTestMixin, UnitTestCase):
     PLUGIN_CLS = CertFile
 
 
-@IOPlugin.register(path='full.der', typ=OpenSSL.crypto.FILETYPE_ASN1)
 @IOPlugin.register(path='full.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
 class FullFile(FileIOPlugin, OpenSSLIOPlugin):
     """Private key, certificate and chain plugin."""
