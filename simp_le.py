@@ -28,6 +28,7 @@ import hashlib
 import errno
 import logging
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -79,6 +80,30 @@ class Error(Exception):
 
 class UnitTestCase(unittest.TestCase):
     """simp_le unit test case."""
+
+
+_PEM_RE_LABELCHAR = '[%s]' % ''.join(
+    [chr(x) for x in range(0x21, 0x7e) if x != 0x2c])
+_PEM_RE = re.compile(
+    r"""
+^-----BEGIN\ ((%(labelchar)s([- ]?%(labelchar)s)*)?)\s*-----$
+.*?
+^-----END\ \1-----\s*""" % {'labelchar': _PEM_RE_LABELCHAR},
+    re.DOTALL | re.MULTILINE | re.VERBOSE)
+_PEMS_SEP = b'\n'
+
+
+def split_pems(buf):
+    r"""Split buffer comprised of PEM encoded (RFC 7468).
+
+    >>> x = '\n-----BEGIN FOO BAR-----\nfoo\nbar\n-----END FOO BAR-----'
+    >>> len(list(split_pems(x * 3)))
+    3
+    >>> list(split_pems(''))
+    []
+    """
+    for match in _PEM_RE.finditer(buf):
+        yield match.group(0)
 
 
 def gen_pkey(bits):
@@ -629,18 +654,16 @@ esac
 class ChainFile(FileIOPlugin, OpenSSLIOPlugin):
     """Certificate chain plugin."""
 
-    _SEP = b'\n\n'  # TODO: do all webservers like this?
-
     def persisted(self):
         return self.Data(account_key=False, key=False, cert=False, chain=True)
 
     def load_from_content(self, output):
         chain = [self.load_cert(cert_data)
-                 for cert_data in output.split(self._SEP)]
+                 for cert_data in split_pems(output)]
         return self.Data(account_key=None, key=None, cert=None, chain=chain)
 
     def save(self, data):
-        return self.save_to_file(self._SEP.join(
+        return self.save_to_file(_PEMS_SEP.join(
             self.dump_cert(chain_cert) for chain_cert in data.chain))
 
 
@@ -726,24 +749,22 @@ class CertFileTest(FileIOPluginTestMixin, UnitTestCase):
 class FullFile(FileIOPlugin, OpenSSLIOPlugin):
     """Private key, certificate and chain plugin."""
 
-    _SEP = b'\n\n'  # TODO: do all webservers like this?
-
     def persisted(self):
         return self.Data(account_key=False, key=True, cert=True, chain=True)
 
     def load_from_content(self, content):
-        parts = content.split(self._SEP)
+        pems = split_pems(content)
         return self.Data(
             account_key=None,
-            key=self.load_key(parts[0]),
-            cert=self.load_cert(parts[1]),
-            chain=[self.load_cert(cert) for cert in parts[2:]],
+            key=self.load_key(next(pems)),
+            cert=self.load_cert(next(pems)),
+            chain=[self.load_cert(cert) for cert in pems],
         )
 
     def save(self, data):
-        parts = [self.dump_key(data.key), self.dump_cert(data.cert)]
-        parts.extend(self.dump_cert(cert) for cert in data.chain)
-        self.save_to_file(self._SEP.join(parts))
+        pems = [self.dump_key(data.key), self.dump_cert(data.cert)]
+        pems.extend(self.dump_cert(cert) for cert in data.chain)
+        self.save_to_file(_PEMS_SEP.join(pems))
 
 
 class FullFileTest(FileIOPluginTestMixin, UnitTestCase):
