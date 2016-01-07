@@ -87,10 +87,10 @@ class UnitTestCase(unittest.TestCase):
 _PEM_RE_LABELCHAR = '[%s]' % ''.join(
     [chr(x) for x in range(0x21, 0x7e) if x != 0x2c])
 _PEM_RE = re.compile(
-    r"""
+    (r"""
 ^-----BEGIN\ ((%(labelchar)s([- ]?%(labelchar)s)*)?)\s*-----$
 .*?
-^-----END\ \1-----\s*""" % {'labelchar': _PEM_RE_LABELCHAR},
+^-----END\ \1-----\s*""" % {'labelchar': _PEM_RE_LABELCHAR}).encode(),
     re.DOTALL | re.MULTILINE | re.VERBOSE)
 _PEMS_SEP = b'\n'
 
@@ -98,10 +98,10 @@ _PEMS_SEP = b'\n'
 def split_pems(buf):
     r"""Split buffer comprised of PEM encoded (RFC 7468).
 
-    >>> x = '\n-----BEGIN FOO BAR-----\nfoo\nbar\n-----END FOO BAR-----'
+    >>> x = b'\n-----BEGIN FOO BAR-----\nfoo\nbar\n-----END FOO BAR-----'
     >>> len(list(split_pems(x * 3)))
     3
-    >>> list(split_pems(''))
+    >>> list(split_pems(b''))
     []
     """
     for match in _PEM_RE.finditer(buf):
