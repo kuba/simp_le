@@ -5,7 +5,7 @@
 # external.sh`.
 
 load () {
-  cat /tmp/foo
+  cat /tmp/foo || true
 }
 
 save () {

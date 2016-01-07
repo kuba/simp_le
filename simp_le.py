@@ -126,7 +126,7 @@ def gen_pkey(bits):
     return pkey
 
 
-def gen_csr(pkey, domains, sig_hash="sha256"):
+def gen_csr(pkey, domains, sig_hash='sha256'):
     """Generate a CSR.
 
     >>> crypto_util._pyopenssl_cert_or_req_san(
@@ -141,13 +141,13 @@ def gen_csr(pkey, domains, sig_hash="sha256"):
     Returns:
       Generated CSR.
     """
-    assert domains, "Must provide one or more hostnames for the CSR."
+    assert domains, 'Must provide one or more hostnames for the CSR.'
     req = OpenSSL.crypto.X509Req()
     req.add_extensions([
         OpenSSL.crypto.X509Extension(
-            b"subjectAltName",
+            b'subjectAltName',
             critical=False,
-            value=b", ".join(b"DNS:" + d for d in domains)
+            value=b', '.join(b'DNS:' + d for d in domains)
         ),
     ])
     req.set_pubkey(pkey)
@@ -826,7 +826,7 @@ def create_parser():
         type=Vhost.decode,
     )
     manager.add_argument(
-        '--default_root', help="Default webroot path.", metavar='PATH',
+        '--default_root', help='Default webroot path.', metavar='PATH',
     )
 
     io_group = parser.add_argument_group('Certificate data files')
