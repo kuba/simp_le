@@ -71,7 +71,7 @@ LE_PRODUCTION_URI = 'https://acme-v01.api.letsencrypt.org/directory'
 LE_CERT_VALIDITY = 90 * 24 * 60 * 60
 DEFAULT_VALID_MIN = LE_CERT_VALIDITY / 3
 
-EXIT_RENEWAL = EXIT_TESTS_OK = EXIT_REVOKE_OK = 0
+EXIT_RENEWAL = EXIT_TESTS_OK = EXIT_REVOKE_OK = EXIT_HELP_VERSION_OK = 0
 EXIT_NO_RENEWAL = 1
 EXIT_ERROR = 2
 
@@ -793,11 +793,11 @@ def create_parser():
 
     modes = parser.add_argument_group()
     modes.add_argument(
-        '-h', '--help', action='help', default=argparse.SUPPRESS,
+        '-h', '--help', action='store_true',
         help='Show this help message and exit.',
     )
     modes.add_argument(
-        '--version', action='version', version=('%(prog)s ' + VERSION),
+        '--version', action='store_true',
         help='Display version and exit.'
     )
     modes.add_argument(
@@ -1323,16 +1323,24 @@ def setup_logging(verbose):
 
 
 def main_with_exceptions(cli_args):
+    # pylint: disable=too-many-return-statements
     """Run the script, throw exceptions on error."""
+    parser = create_parser()
     try:
-        args = create_parser().parse_args(cli_args)
+        args = parser.parse_args(cli_args)
     except SystemExit:
         return EXIT_ERROR
 
     if args.test:  # --test
         return test(args)
-    if args.integration_test:  # --integration_test
+    elif args.integration_test:  # --integration_test
         return integration_test(args)
+    elif args.help:  # --help
+        parser.print_help()
+        return EXIT_HELP_VERSION_OK
+    elif args.version:  # --version
+        sys.stdout.write('%s %s\n' % (os.path.basename(sys.argv[0]), VERSION))
+        return EXIT_HELP_VERSION_OK
 
     setup_logging(args.verbose)
     logger.debug('%r parsed as %r', cli_args, args)
@@ -1383,6 +1391,15 @@ class MainTest(UnitTestCase):
 
     # this is a test suite | pylint: disable=missing-docstring
 
+    @classmethod
+    def _run(cls, args):
+        return main(shlex.split(args))
+
+    @mock.patch('sys.stdout')
+    def test_exit_code_help_version_ok(self, dummy_stdout):
+        self.assertEqual(EXIT_HELP_VERSION_OK, self._run('--help'))
+        self.assertEqual(EXIT_HELP_VERSION_OK, self._run('--version'))
+
     @mock.patch('sys.stderr')
     def test_error_exit_codes(self, dummy_stderr):
         test_args = [
@@ -1407,7 +1424,7 @@ class MainTest(UnitTestCase):
         ]])
 
         for args in test_args:
-            self.assertEqual(EXIT_ERROR, main(shlex.split(args)))
+            self.assertEqual(EXIT_ERROR, self._run(args))
 
 
 @contextlib.contextmanager
