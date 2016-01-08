@@ -484,9 +484,7 @@ class ExternalIOPlugin(OpenSSLIOPlugin):
                 [self.script, command], stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE)
         except (OSError, subprocess.CalledProcessError) as error:
-            logger.exception(error)
-            raise Error(
-                'There was a problem executing external IO plugin script')
+            raise Error('Failed to execute external script: %s' % error)
 
         stdout, stderr = proc.communicate()
         if stderr is not None:
@@ -615,20 +613,29 @@ class ExternalIOPluginTest(PluginIOTestMixin, UnitTestCase):
             external_plugin_file.write(contents)
         os.chmod(self.path, 0o700)
 
+    def check_error(self, msg, func, *args):
+        try:
+            func(*args)
+        except Error as e:
+            self.assertTrue(msg in str(e), '%r not found in %r' % (msg, e))
+        else:
+            self.fail('Expected error: %s' % msg)
+
     def test_no_persisted_empty(self):
         self.save_script('#!/bin/sh')
         self.assertEqual(IOPlugin.EMPTY_DATA, self.plugin.load())
 
     def test_missing_path_raises_error(self):
-        self.assertRaises(Error, self.plugin.load)
+        self.check_error('Failed to execute external script', self.plugin.load)
 
     def test_load_nonzero_raises_error(self):
         self.save_script('#!/bin/sh\nfalse')
-        self.assertRaises(Error, self.plugin.load)
+        self.check_error('exited with non-zero code: 1', self.plugin.load)
 
     def test_save_nonzero_raises_error(self):
         self.save_script('#!/bin/sh\nfalse')
-        self.assertRaises(Error, self.plugin.save, self.key_data)
+        self.check_error('exited with non-zero code: 1',
+                         self.plugin.save, self.key_data)
 
     def one_file_script(self, persisted):
         path = os.path.join(self.root, 'pem')
@@ -636,7 +643,7 @@ class ExternalIOPluginTest(PluginIOTestMixin, UnitTestCase):
 #!/bin/sh
 case $1 in
   save) cat - > {path};;
-  load) cat {path} || true;;
+  load) [ ! -f {path} ] ||  cat {path};;
   persisted) echo {persisted};;
 esac
 """.format(path=path, persisted=persisted))
