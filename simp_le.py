@@ -115,13 +115,12 @@ class UnitTestCase(unittest.TestCase):
         self.assert_raises_regexp(Error, *args, **kwargs)
 
 
-_PEM_RE_LABELCHAR = '[%s]' % ''.join(
-    [chr(x) for x in range(0x21, 0x7e) if x != 0x2c])
+_PEM_RE_LABELCHAR = r'[\x21-\x2c\x2e-\x7e]'
 _PEM_RE = re.compile(
     (r"""
-^-----BEGIN\ ((%(labelchar)s([- ]?%(labelchar)s)*)?)\s*-----$
+^-----BEGIN\ ((?:%s(?:[- ]?%s)*)?)\s*-----$
 .*?
-^-----END\ \1-----\s*""" % {'labelchar': _PEM_RE_LABELCHAR}).encode(),
+^-----END\ \1-----\s*""" % (_PEM_RE_LABELCHAR, _PEM_RE_LABELCHAR)).encode(),
     re.DOTALL | re.MULTILINE | re.VERBOSE)
 _PEMS_SEP = b'\n'
 
