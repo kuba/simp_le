@@ -83,6 +83,37 @@ class Error(Exception):
 class UnitTestCase(unittest.TestCase):
     """simp_le unit test case."""
 
+    class AssertRaisesContext(object):
+        """Context for assert_raises."""
+        # pylint: disable=too-few-public-methods
+
+        def __init__(self):
+            self.error = None
+
+    @contextlib.contextmanager
+    def assert_raises(self, exc):
+        """Assert raises context manager."""
+        context = self.AssertRaisesContext()
+        try:
+            yield context
+        except exc as error:
+            context.error = error
+        else:
+            self.fail('Expected exception (%s) not raised' % exc)
+
+    def assert_raises_regexp(self, exc, regexp, func, *args, **kwargs):
+        """Assert raises that tests exception message against regexp."""
+        with self.assert_raises(exc) as context:
+            func(*args, **kwargs)
+        msg = str(context.error)
+        self.assertTrue(re.match(regexp, msg) is not None,
+                        "Exception message (%s) doesn't match "
+                        "regexp (%s)" % (msg, regexp))
+
+    def assert_raises_error(self, *args, **kwargs):
+        """Assert raises simp_le error with given message."""
+        self.assert_raises_regexp(Error, *args, **kwargs)
+
 
 _PEM_RE_LABELCHAR = '[%s]' % ''.join(
     [chr(x) for x in range(0x21, 0x7e) if x != 0x2c])
@@ -613,29 +644,23 @@ class ExternalIOPluginTest(PluginIOTestMixin, UnitTestCase):
             external_plugin_file.write(contents)
         os.chmod(self.path, 0o700)
 
-    def check_error(self, msg, func, *args):
-        try:
-            func(*args)
-        except Error as e:
-            self.assertTrue(msg in str(e), '%r not found in %r' % (msg, e))
-        else:
-            self.fail('Expected error: %s' % msg)
-
     def test_no_persisted_empty(self):
         self.save_script('#!/bin/sh')
         self.assertEqual(IOPlugin.EMPTY_DATA, self.plugin.load())
 
     def test_missing_path_raises_error(self):
-        self.check_error('Failed to execute external script', self.plugin.load)
+        self.assert_raises_error(
+            'Failed to execute external script', self.plugin.load)
 
     def test_load_nonzero_raises_error(self):
         self.save_script('#!/bin/sh\nfalse')
-        self.check_error('exited with non-zero code: 1', self.plugin.load)
+        self.assert_raises_error(
+            '.*exited with non-zero code: 1', self.plugin.load)
 
     def test_save_nonzero_raises_error(self):
         self.save_script('#!/bin/sh\nfalse')
-        self.check_error('exited with non-zero code: 1',
-                         self.plugin.save, self.key_data)
+        self.assert_raises_error(
+            '.*exited with non-zero code: 1', self.plugin.save, self.key_data)
 
     def one_file_script(self, persisted):
         path = os.path.join(self.root, 'pem')
