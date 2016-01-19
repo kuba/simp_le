@@ -250,16 +250,6 @@ class ComparablePKey(object):  # pylint: disable=too-few-public-methods
         return self._dump() == other._dump()
 
 
-def detect_and_log_mismatch(names, existing, requested, log_data=lambda x: x):
-    """Detect and log mismatch."""
-    if existing != requested:
-        logger.error('Existing (%s) and requested (%s) %s mismatch',
-                     log_data(existing), log_data(requested), names)
-        return True
-    else:
-        return False
-
-
 class Vhost(collections.namedtuple('Vhost', 'name root')):
     """Vhost: domain name and public html root."""
     _SEP = ':'
@@ -1174,34 +1164,36 @@ def pyopenssl_cert_or_req_san(cert):
 def valid_existing_cert(cert, vhosts, valid_min):
     """Is the existing cert data valid for enough time?
 
-    >>> valid_existing_cert(None, [], 0)
+    If provided certificate is `None`, then always return True:
+
+    >>> valid_existing_cert(cert=None, vhosts=[], valid_min=0)
     False
+
     >>> cert = crypto_util.gen_ss_cert(
     ...     gen_pkey(1024), ['example.com'], validity=(60 *60))
+
+    Return True iff `valid_min` is not bigger than certificate lifespan:
+
     >>> valid_existing_cert(cert, [Vhost.decode('example.com')], 0)
     True
     >>> valid_existing_cert(cert, [Vhost.decode('example.com')], 60 * 60 + 1)
     False
+
+    If SANs mismatch return False no matter if expiring or not:
+
     >>> valid_existing_cert(cert, [Vhost.decode('example.net')], 0)
-    Traceback (most recent call last):
-    ...
-    Error: Backup and remove existing cert if you want to proceed
-    >>> valid_existing_cert(cert, [], 0)
-    Traceback (most recent call last):
-    ...
-    Error: Backup and remove existing cert if you want to proceed
+    False
+    >>> valid_existing_cert(cert, [Vhost.decode('example.org')], 60 * 60 + 1)
+    False
     """
     if cert is None:
         return False  # no existing certificate
     else:  # renew existing?
-        sans = pyopenssl_cert_or_req_san(cert)
-        logger.debug('Existing SANs: %r', sans)
-        if detect_and_log_mismatch(
-                'SANs', set(sans), set(vhost.name for vhost in vhosts),
-                log_data=', '.join):
-            raise Error(
-                'Backup and remove existing cert if you want to proceed')
-        return not renewal_necessary(cert, valid_min)
+        new_sans = [vhost.name for vhost in vhosts]
+        existing_sans = pyopenssl_cert_or_req_san(cert)
+        logger.debug('Existing SANs: %r, new: %r', existing_sans, new_sans)
+        return (set(existing_sans) == set(new_sans) and
+                not renewal_necessary(cert, valid_min))
 
 
 def check_or_generate_account_key(args, existing):
@@ -1213,15 +1205,6 @@ def check_or_generate_account_key(args, existing):
             key_size=args.account_key_size,
             backend=default_backend(),
         ))
-
-    mismatch = False
-    mismatch |= detect_and_log_mismatch(
-        'key sizes', existing.key.key_size, args.account_key_size)
-    mismatch |= detect_and_log_mismatch(
-        'public key exponents', existing.public_key().key.public_numbers().e,
-        args.account_key_public_exponent)
-    if mismatch:
-        raise Error('Please adjust flags or backup and remove old key')
     return existing
 
 
@@ -1523,6 +1506,10 @@ class IntegrationTests(unittest.TestCase):
                 self.SERVER))
             # Revocation shouldn't touch any files
             self.assertEqual(initial_stats, self.get_stats(*files))
+
+            # Changing SANs should trigger "renewal"
+            self.assertEqual(
+                EXIT_RENEWAL, self._run('%s -d le2.wtf:%s' % (args, webroot)))
 
 
 if __name__ == '__main__':
