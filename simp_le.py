@@ -1438,7 +1438,8 @@ class MainTest(UnitTestCase):
         ]])
 
         for args in test_args:
-            self.assertEqual(EXIT_ERROR, self._run(args))
+            self.assertEqual(
+                EXIT_ERROR, self._run(args), 'Wrong exit code for %s' % args)
 
 
 @contextlib.contextmanager
