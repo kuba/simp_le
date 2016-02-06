@@ -12,6 +12,7 @@ addons:
   mariadb: '10.0'
   hosts:
     - le.wtf
+    - le2.wtf
   apt:
     packages:
       # keep in sync with bootstrap.sh
