@@ -783,7 +783,7 @@ def create_parser():
         help='Directory URI for the CA ACME API endpoint.',
     )
 
-    parser.add_argument('root')
+    parser.add_argument('root', nargs='?', help='Path to webroot.')
     return parser
 
 
@@ -1194,6 +1194,8 @@ def main_with_exceptions(cli_args):
     elif args.version:  # --version
         sys.stdout.write('%s %s\n' % (os.path.basename(sys.argv[0]), VERSION))
         return EXIT_HELP_VERSION_OK
+    elif args.root is None:
+        raise Error('Webroot argument is required')
 
     setup_logging(args.verbose)
     logger.debug('%r parsed as %r', cli_args, args)
