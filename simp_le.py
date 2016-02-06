@@ -687,34 +687,6 @@ class CertFileTest(FileIOPluginTestMixin, UnitTestCase):
     PLUGIN_CLS = CertFile
 
 
-@IOPlugin.register(path='full.pem', typ=OpenSSL.crypto.FILETYPE_PEM)
-class FullFile(FileIOPlugin, OpenSSLIOPlugin):
-    """Private key, certificate and chain plugin."""
-
-    def persisted(self):
-        return self.Data(account_key=False, csr=True, cert=True, chain=True)
-
-    def load_from_content(self, content):
-        pems = split_pems(content)
-        return self.Data(
-            account_key=None,
-            csr=self.load_csr(next(pems)),
-            cert=self.load_cert(next(pems)),
-            chain=[self.load_cert(cert) for cert in pems],
-        )
-
-    def save(self, data):
-        pems = [self.dump_csr(data.csr), self.dump_cert(data.cert)]
-        pems.extend(self.dump_cert(cert) for cert in data.chain)
-        self.save_to_file(_PEMS_SEP.join(pems))
-
-
-class FullFileTest(FileIOPluginTestMixin, UnitTestCase):
-    """Tests for FullFile."""
-    # this is a test suite | pylint: disable=missing-docstring
-    PLUGIN_CLS = FullFile
-
-
 def create_parser():
     """Create argument parser."""
     parser = argparse.ArgumentParser(
