@@ -181,6 +181,12 @@ def gen_csr(pkey, domains, sig_hash='sha256'):
         ),
     ])
     req.set_pubkey(pkey)
+
+    # pre-1.0.2 version of OpenSSL the generated CSR will contain a
+    # zero-length Version field which will cause some strict parsers
+    # (e.g. the one in Golang, used by Boulder) to fail.
+    req.set_version(2)
+
     req.sign(pkey, sig_hash)
     return req
 
