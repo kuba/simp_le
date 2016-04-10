@@ -13,6 +13,8 @@ addons:
   hosts:
     - le.wtf
     - le2.wtf
+    - boulder-mysql
+    - boulder-rabbitmq
   apt:
     packages:
       # keep in sync with bootstrap.sh
