@@ -181,6 +181,12 @@ def gen_csr(pkey, domains, sig_hash='sha256'):
         ),
     ])
     req.set_pubkey(pkey)
+
+    # pre-1.0.2 version of OpenSSL the generated CSR will contain a
+    # zero-length Version field which will cause some strict parsers
+    # (e.g. the one in Golang, used by Boulder) to fail.
+    req.set_version(2)
+
     req.sign(pkey, sig_hash)
     return req
 
@@ -1465,8 +1471,8 @@ class IntegrationTests(unittest.TestCase):
     # this is a test suite | pylint: disable=missing-docstring
 
     SERVER = 'http://localhost:4000/directory'
-    TOS_SHA256 = ('3ae9d8149e59b8845069552fdae761c3'
-                  'a042fc5ede1fcdf8f37f7aa4707c4d6e')
+    TOS_SHA256 = ('b16e15764b8bc06c5c3f9f19bc8b99fa'
+                  '48e7894aa5a6ccdad65da49bbf564793')
     PORT = 5002
 
     @classmethod
