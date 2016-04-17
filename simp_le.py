@@ -1495,10 +1495,9 @@ class IntegrationTests(unittest.TestCase):
         def _single_path_stats(path):
             all = os.stat(path)
             stats = dict(
-                (name[3:], getattr(all, name))
-                for name in dir(all)
-                # skip access (read) time
-                if name.startswith('st_') and name != 'st_atime')
+                (name[3:], getattr(all, name)) for name in dir(all)
+                # skip access (read) time, includes _ns.
+                if name.startswith('st_') and name.startswith('st_atime'))
             # st_*time has a second-granularity so it can't be
             # reliably used to prove that contents have changed or not
             with open(path, 'rb') as f:
