@@ -39,6 +39,10 @@ env:
     - TOXENV=py27
     - TOXENV=py33
     - TOXENV=py34
+    - TOXENV=py26-oldest
+    - TOXENV=py27-oldest
+    - TOXENV=py33-oldest
+    - TOXENV=py34-oldest
     - TOXENV=lint
 matrix:
   include:
