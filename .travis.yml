@@ -11,8 +11,8 @@ services:
 addons:
   mariadb: '10.0'
   hosts:
-    - le.test
-    - le2.test
+    - le.example.org
+    - le2.example.org
     - boulder
     - boulder-mysql
     - boulder-rabbitmq
