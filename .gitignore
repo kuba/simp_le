@@ -15,5 +15,6 @@
 # ... as well as external IO plugin script
 /external.sh
 
-# `sshfs user@host:$ROOT public_html/` and `--default_root=public_html`
+# `sshfs user@host:$ROOT public_html/.well-known/acme-challenge` and
+# `simp_le ... public_html/.well-known/acme-challenge`
 /public_html/

@@ -7,10 +7,10 @@ Simple `Let’s Encrypt`_ client.
 
 .. code:: shell
 
+    ./examples/generate_csr.sh example.com
     simp_le --email you@example.com -f account_key.json \
-      -f fullchain.pem -f key.pem \
-      -d example.com -d www.example.com --default_root /var/www/html \
-      -d example.net:/var/www/other_html
+      -f csr.pem -f fullchain.pem -f chain.pem -f cert.pem \
+      /var/www/html/.well-known/acme-challenge
 
 For more info see ``simp_le --help``.
 
@@ -22,9 +22,9 @@ Manifest
 2.  ``simp_le --valid_min ${seconds?} -f cert.pem`` implies that
     ``cert.pem`` is valid for at at least ``valid_min``. Register new
     ACME CA account if necessary. Issue new certificate if no previous
-    key/certificate/chain found. Renew only if necessary.
+    certificate/chain found. Renew only if necessary.
 
-3.  (Sophisticated) “manager” for
+3.  (Sophisticated) "manager" for
     ``${webroot?}/.well-known/acme-challenge`` only. No challenges other
     than ``http-01``. Existing web-server must be running already.
 
@@ -40,16 +40,16 @@ Manifest
     should write their own wrapper scripts or use shell aliases if
     necessary.
 
-8.  Support multiple domains with multiple roots. Always create single
+8.  Support multiple domains (sharing
+    ``${webroot?}/.well-known/acme-challenge``). Always create single
     SAN certificate per ``simp_le`` run.
 
-9.  Flexible storage capabilities. Built-in
-    ``simp_le -f fullchain.pem    -f key.pem``,
-    ``simp_le -f chain.pem -f cert.pem -f key.pem``, etc. Extensions
-    through ``simp_le -f external.sh``.
+9.  Flexible storage capabilities. Built-in ``simp_le -f
+    fullchain.pem``, ``simp_le -f chain.pem -f cert.pem``,
+    etc. Extensions through ``simp_le -f external.sh``.
 
-10. Do not allow specifying output file paths. Users should symlink if
-    necessary!
+10. Do not allow specifying input/output file paths. Users should
+    symlink if necessary!
 
 11. No need to allow specifying an arbitrary command when renewal has
     happened, just check the exit code:

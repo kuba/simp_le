@@ -366,7 +366,7 @@ class OpenSSLIOPlugin(IOPlugin):  # pylint: disable=abstract-method
         """Dump CSR."""
         # pylint: disable=protected-access
         return OpenSSL.crypto.dump_certificate_request(
-            self.typ, data._wrapped).strip()
+            self.typ, data.wrapped).strip()
 
     def load_cert(self, data):
         """Load certificate."""
@@ -661,7 +661,8 @@ class CSRFile(FileIOPlugin, OpenSSLIOPlugin):
                          cert=None, chain=None)
 
     def save(self, data):
-        return  # CSRs are read-only
+        # TODO: CSRs should be read-only, it's silly to overwrite existing file
+        return self.save_to_file(self.dump_csr(data.csr))
 
 
 class CSRFileTest(FileIOPluginTestMixin, UnitTestCase):
@@ -819,12 +820,13 @@ def save_validation(root, challb, validation):
       validation: `http-01` validation
     """
     try:
-        os.makedirs(os.path.join(root, challb.URI_ROOT_PATH))
+        os.makedirs(root)
     except OSError as error:
         if error.errno != errno.EEXIST:
             # directory doesn't already exist and we cannot create it
             raise
-    path = os.path.join(root, challb.path[1:])
+    # TODO: this is a nasty hack
+    path = os.path.join(root, challb.path.split('/')[-1])
     with open(path, 'w') as validation_file:
         logger.debug('Saving validation (%r) at %s', validation, path)
         validation_file.write(validation)
@@ -1040,10 +1042,10 @@ def valid_existing_cert(cert, names, valid_min):
     if cert is None:
         return False  # no existing certificate
     else:  # renew existing?
-        existing_sans = pyopenssl_cert_or_req_san(cert)
+        existing_sans = pyopenssl_cert_or_req_san(cert.wrapped)
         logger.debug('Existing SANs: %r, new: %r', existing_sans, names)
         return (set(existing_sans) == set(names) and
-               not renewal_necessary(cert, valid_min))
+                not renewal_necessary(cert, valid_min))
 
 
 def check_or_generate_account_key(args, existing):
@@ -1087,7 +1089,7 @@ def get_certr(client, csr, authorizations):
     """Get Certificate Resource for specified CSR and authorizations."""
     try:
         certr, _ = client.poll_and_request_issuance(
-            jose.ComparableX509(csr), authorizations.values(),
+            csr, authorizations.values(),
             # https://github.com/letsencrypt/letsencrypt/issues/1719
             max_attempts=(10 * len(authorizations)))
     except acme_errors.PollError as error:
@@ -1104,10 +1106,10 @@ def get_certr(client, csr, authorizations):
             logger.error('CA marked some of the authorizations as invalid, '
                          'which likely means it could not access '
                          'http://example.com/.well-known/acme-challenge/X. '
-                         'Did you set correct path in -d example.com:path '
-                         'or --default_root? Is there a warning log entry '
-                         'about unsuccessful self-verification? Are all your '
-                         'domains accessible from the internet? Failing '
+                         'Did you set correct webroot path? Is there a '
+                         'warning log entry about unsuccessful '
+                         'self-verification? Are all your domains '
+                         'accessible from the internet? Failing '
                          'authorizations: %s',
                          ', '.join(authzr.uri for authzr in invalid))
 
@@ -1148,7 +1150,7 @@ def new_data(args, existing, names):
     certr = get_certr(client, existing.csr, authorizations)
     # pylint: disable=protected-access
     assert set(names) == set(crypto_util._pyopenssl_cert_or_req_san(
-        certr.body._wrapped))  # pylint: disable=no-member
+        certr.body.wrapped))  # pylint: disable=no-member
     persist_data(args, IOPlugin.Data(
         account_key=client.key, csr=existing.csr,
         cert=certr.body, chain=client.fetch_chain(certr)))
@@ -1216,7 +1218,7 @@ def main_with_exceptions(cli_args):
     assert existing_data.csr is not None
     # pylint: disable=protected-access
     names = crypto_util._pyopenssl_cert_or_req_san(
-        existing_data.csr._wrapped)
+        existing_data.csr.wrapped)
     if valid_existing_cert(existing_data.cert, names, args.valid_min):
         logger.info('Certificates already exist and renewal is not '
                     'necessary, exiting with status code %d.', EXIT_NO_RENEWAL)
@@ -1269,23 +1271,18 @@ class MainTest(UnitTestCase):
         test_args = [
             '',  # no args - no good
             '--bar',  # unrecognized
-            '-f account_key.json -f key.pem -f fullchain.pem',  # no vhosts
-            # no root
-            '-f account_key.json -f key.pem -f fullchain.pem -d example.com',
-            # no root with multiple domains
-            '-f account_key.json -f key.pem -f fullchain.pem '
-            '-d example.com:public_html  -d www.example.com',
+            '-f account_key.json -f csr.pem -f fullchain.pem',  # no root
         ]
         # missing plugin coverage
-        test_args.extend(['-d example.com:public_html %s' % rest for rest in [
+        test_args.extend([
             '-f account_key.json',
-            '-f key.pem',
-            '-f account_key.json -f key.pem',
-            '-f key.pem -f cert.pem',
-            '-f key.pem -f chain.pem',
+            '-f csr.pem',
+            '-f account_key.json -f csr.pem',
+            '-f csr.pem -f cert.pem',
+            '-f csr.pem -f chain.pem',
             '-f fullchain.pem',
             '-f cert.pem -f fullchain.pem',
-        ]])
+        ])
 
         for args in test_args:
             self.assertEqual(
@@ -1314,6 +1311,7 @@ class IntegrationTests(unittest.TestCase):
     # this is a test suite | pylint: disable=missing-docstring
 
     SERVER = 'http://localhost:4000/directory'
+    BOULDER_MIN_BITS = 2048
     TOS_SHA256 = ('b16e15764b8bc06c5c3f9f19bc8b99fa'
                   '48e7894aa5a6ccdad65da49bbf564793')
     PORT = 5002
@@ -1338,12 +1336,18 @@ class IntegrationTests(unittest.TestCase):
         return dict((path, os.stat(path)) for path in paths)
 
     def test_it(self):
-        webroot = os.path.join(os.getcwd(), 'public_html')
+        webroot = os.path.join(
+            os.getcwd(), 'public_html', '.well-known', 'acme-challenge')
         args = ('--server %s --tos_sha256 %s -f account_key.json '
-                '-f key.pem -f full.pem -d le.wtf:%s' % (
+                '-f csr.pem -f fullchain.pem %s' % (
                     self.SERVER, self.TOS_SHA256, webroot))
-        files = ('account_key.json', 'key.pem', 'full.pem')
+        files = ('account_key.json', 'csr.pem', 'fullchain.pem')
+
         with self._new_swd():
+            IOPlugin.registered['csr.pem'].save(IOPlugin.EMPTY_DATA._replace(
+                csr=jose.ComparableX509(
+                    gen_csr(gen_pkey(self.BOULDER_MIN_BITS), [b'le.wtf']))))
+
             self.assertEqual(EXIT_RENEWAL, self._run(args))
             initial_stats = self.get_stats(*files)
 
@@ -1353,14 +1357,14 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(initial_stats, self.get_stats(*files))
 
             self.assertEqual(EXIT_REVOKE_OK, self._run(
-                '--server %s --revoke -f account_key.json -f full.pem' %
+                '--server %s --revoke -f account_key.json -f fullchain.pem' %
                 self.SERVER))
             # Revocation shouldn't touch any files
             self.assertEqual(initial_stats, self.get_stats(*files))
 
             # Changing SANs should trigger "renewal"
             self.assertEqual(
-                EXIT_RENEWAL, self._run('%s -d le2.wtf:%s' % (args, webroot)))
+                EXIT_RENEWAL, self._run('%s %s' % (args, webroot)))
 
 
 if __name__ == '__main__':
