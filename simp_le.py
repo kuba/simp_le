@@ -1369,7 +1369,7 @@ class IntegrationTests(unittest.TestCase):
             self._save_csr(b'le.wtf')
             self.assertEqual(EXIT_RENEWAL, self._run(args))
             initial_stats = self.get_stats(*files)
-            unchangeable_stats = self.get_stats(*files[:2])
+            unchangeable_stats = self.get_stats(files[0])
 
             self.assertEqual(EXIT_NO_RENEWAL, self._run(args))
             # No renewal => no files should be touched
@@ -1384,9 +1384,8 @@ class IntegrationTests(unittest.TestCase):
 
             # Changing SANs should trigger "renewal"
             self._save_csr(b'le.wtf', b'le2.wtf')
-            # but it shouldn't unnecessarily overwrite the account key
-            # or CSR (#67)
-            self.assertEqual(unchangeable_stats, self.get_stats(*files[:2]))
+            # but it shouldn't unnecessarily overwrite the account key (#67)
+            self.assertEqual(unchangeable_stats, self.get_stats(files[0]))
 
 
 if __name__ == '__main__':
