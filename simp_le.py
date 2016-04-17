@@ -159,8 +159,8 @@ def gen_pkey(bits):
 def gen_csr(pkey, domains, sig_hash='sha256'):
     """Generate a CSR.
 
-    >>> crypto_util._pyopenssl_cert_or_req_san(
-    ...     gen_csr(gen_pkey(1024), [b'example.com', b'example.net']))
+    >>> [str(domain) for domain in crypto_util._pyopenssl_cert_or_req_san(
+    ...     gen_csr(gen_pkey(1024), [b'example.com', b'example.net']))]
     ['example.com', 'example.net']
 
     Args:
@@ -181,6 +181,12 @@ def gen_csr(pkey, domains, sig_hash='sha256'):
         ),
     ])
     req.set_pubkey(pkey)
+
+    # pre-1.0.2 version of OpenSSL the generated CSR will contain a
+    # zero-length Version field which will cause some strict parsers
+    # (e.g. the one in Golang, used by Boulder) to fail.
+    req.set_version(2)
+
     req.sign(pkey, sig_hash)
     return req
 
@@ -450,8 +456,7 @@ class OpenSSLIOPlugin(IOPlugin):  # pylint: disable=abstract-method
 
     def dump_cert(self, data):
         """Dump certificate."""
-        # pylint: disable=protected-access
-        return OpenSSL.crypto.dump_certificate(self.typ, data._wrapped).strip()
+        return OpenSSL.crypto.dump_certificate(self.typ, data.wrapped).strip()
 
 
 def load_pem_jwk(data):
@@ -1169,8 +1174,8 @@ def valid_existing_cert(cert, vhosts, valid_min):
     >>> valid_existing_cert(cert=None, vhosts=[], valid_min=0)
     False
 
-    >>> cert = crypto_util.gen_ss_cert(
-    ...     gen_pkey(1024), ['example.com'], validity=(60 *60))
+    >>> cert = jose.ComparableX509(crypto_util.gen_ss_cert(
+    ...     gen_pkey(1024), ['example.com'], validity=(60 *60)))
 
     Return True iff `valid_min` is not bigger than certificate lifespan:
 
@@ -1190,7 +1195,7 @@ def valid_existing_cert(cert, vhosts, valid_min):
         return False  # no existing certificate
     else:  # renew existing?
         new_sans = [vhost.name for vhost in vhosts]
-        existing_sans = pyopenssl_cert_or_req_san(cert)
+        existing_sans = pyopenssl_cert_or_req_san(cert.wrapped)
         logger.debug('Existing SANs: %r, new: %r', existing_sans, new_sans)
         return (set(existing_sans) == set(new_sans) and
                 not renewal_necessary(cert, valid_min))
@@ -1237,14 +1242,16 @@ def get_certr(client, csr, authorizations):
     """Get Certificate Resource for specified CSR and authorizations."""
     try:
         certr, _ = client.poll_and_request_issuance(
-            csr, authorizations.values(),
+            jose.ComparableX509(csr), authorizations.values(),
             # https://github.com/letsencrypt/letsencrypt/issues/1719
             max_attempts=(10 * len(authorizations)))
     except acme_errors.PollError as error:
         if error.timeout:
-            logger.error('Timed out while waiting for CA to verify '
-                         'challenge(s) for the following authorizations: %s',
-                         ', '.join(authzr.uri for _, authzr in error.waiting))
+            logger.error(
+                'Timed out while waiting for CA to verify '
+                'challenge(s) for the following authorizations: %s',
+                ', '.join(authzr.uri for _, authzr in error.exhausted)
+            )
 
         invalid = [authzr for authzr in six.itervalues(error.updated)
                    if authzr.body.status == messages.STATUS_INVALID]
@@ -1272,7 +1279,7 @@ def new_data(args, existing):
 
     authorizations = dict(
         (vhost.name, client.request_domain_challenges(
-            vhost.name, new_authz_uri=client.directory.new_authz))
+            vhost.name, new_authzr_uri=client.directory.new_authz))
         for vhost in args.vhosts
     )
     if any(supported_challb(auth) is None
@@ -1464,8 +1471,8 @@ class IntegrationTests(unittest.TestCase):
     # this is a test suite | pylint: disable=missing-docstring
 
     SERVER = 'http://localhost:4000/directory'
-    TOS_SHA256 = ('3ae9d8149e59b8845069552fdae761c3'
-                  'a042fc5ede1fcdf8f37f7aa4707c4d6e')
+    TOS_SHA256 = ('b16e15764b8bc06c5c3f9f19bc8b99fa'
+                  '48e7894aa5a6ccdad65da49bbf564793')
     PORT = 5002
 
     @classmethod

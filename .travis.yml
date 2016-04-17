@@ -13,6 +13,9 @@ addons:
   hosts:
     - le.wtf
     - le2.wtf
+    - boulder
+    - boulder-mysql
+    - boulder-rabbitmq
   apt:
     packages:
       # keep in sync with bootstrap.sh
@@ -36,12 +39,18 @@ env:
     - TOXENV=py27
     - TOXENV=py33
     - TOXENV=py34
+    - TOXENV=py26-oldest
+    - TOXENV=py27-oldest
+    - TOXENV=py33-oldest
+    - TOXENV=py34-oldest
     - TOXENV=lint
 matrix:
   include:
     # python3.5 is not pre-installed on Travis,
     # https://github.com/travis-ci/travis-ci/issues/4794#issuecomment-143758799
     - env: TOXENV=py35
+      python: 3.5
+    - env: TOXENV=py35-oldest
       python: 3.5
 
 # source is used mainly for eval+gimme, so `install` can use the right
