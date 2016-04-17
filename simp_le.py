@@ -859,13 +859,17 @@ def componentwise_or(first, second):
     return tuple(x or y for x, y in zip(first, second))
 
 
-def persist_data(args, data):
+def persist_data(args, existing_data, new_data):
     """Persist data on disk.
 
     Uses all selected plugins to save certificate data to disk.
     """
     for plugin_name in args.ioplugins:
-        IOPlugin.registered[plugin_name].save(data)
+        plugin = IOPlugin.registered[plugin_name]
+        if any(persisted and existing != new
+               for persisted, existing, new in
+               zip(plugin.persisted(), existing_data, new_data)):
+            plugin.save(new_data)
 
 
 def asn1_generalizedtime_to_dt(timestamp):
@@ -1117,10 +1121,10 @@ def get_certr(client, csr, authorizations):
     return certr
 
 
-def new_data(args, existing, names):
+def persist_new_data(args, existing_data, names):
     """Issue and persist new key/cert/chain."""
     assert names
-    client = registered_client(args, existing.account_key)
+    client = registered_client(args, existing_data.account_key)
 
     authorizations = dict(
         (name, client.request_domain_challenges(
@@ -1147,25 +1151,25 @@ def new_data(args, existing, names):
 
         client.answer_challenge(challb, response)
 
-    certr = get_certr(client, existing.csr, authorizations)
+    certr = get_certr(client, existing_data.csr, authorizations)
     # pylint: disable=protected-access
     assert set(names) == set(crypto_util._pyopenssl_cert_or_req_san(
         certr.body.wrapped))  # pylint: disable=no-member
-    persist_data(args, IOPlugin.Data(
-        account_key=client.key, csr=existing.csr,
+    persist_data(args, existing_data, new_data=IOPlugin.Data(
+        account_key=client.key, csr=existing_data.csr,
         cert=certr.body, chain=client.fetch_chain(certr)))
 
 
 def revoke(args):
     """Revoke certificate."""
-    existing = load_existing_data(args.ioplugins)
-    if existing.cert is None:
+    existing_data = load_existing_data(args.ioplugins)
+    if existing_data.cert is None:
         raise Error('No existing certificate')
 
-    key = check_or_generate_account_key(args, existing.account_key)
+    key = check_or_generate_account_key(args, existing_data.account_key)
     net = acme_client.ClientNetwork(key, user_agent=args.user_agent)
     client = acme_client.Client(directory=args.server, key=key, net=net)
-    client.revoke(existing.cert)
+    client.revoke(existing_data.cert)
     return EXIT_REVOKE_OK
 
 
@@ -1225,7 +1229,7 @@ def main_with_exceptions(cli_args):
                     'necessary, exiting with status code %d.', EXIT_NO_RENEWAL)
         return EXIT_NO_RENEWAL
     else:
-        new_data(args, existing_data, names)
+        persist_new_data(args, existing_data, names)
         return EXIT_RENEWAL
 
 
@@ -1365,6 +1369,7 @@ class IntegrationTests(unittest.TestCase):
             self._save_csr(b'le.wtf')
             self.assertEqual(EXIT_RENEWAL, self._run(args))
             initial_stats = self.get_stats(*files)
+            unchangeable_stats = self.get_stats(*files[:2])
 
             self.assertEqual(EXIT_NO_RENEWAL, self._run(args))
             # No renewal => no files should be touched
@@ -1379,7 +1384,9 @@ class IntegrationTests(unittest.TestCase):
 
             # Changing SANs should trigger "renewal"
             self._save_csr(b'le.wtf', b'le2.wtf')
-            self.assertEqual(EXIT_RENEWAL, self._run(args))
+            # but it shouldn't unnecessarily overwrite the account key
+            # or CSR (#67)
+            self.assertEqual(unchangeable_stats, self.get_stats(*files[:2]))
 
 
 if __name__ == '__main__':
