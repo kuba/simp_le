@@ -514,7 +514,7 @@ class PluginIOTestMixin(object):
                 public_exponent=65537, key_size=1024,
                 backend=default_backend(),
             )),
-            csr=jose.ComparableX509(gen_csr(raw_key, ['example.com'])),
+            csr=jose.ComparableX509(gen_csr(raw_key, [b'example.com'])),
             cert=jose.ComparableX509(crypto_util.gen_ss_cert(raw_key, ['a'])),
             chain=[
                 jose.ComparableX509(crypto_util.gen_ss_cert(raw_key, ['b'])),
