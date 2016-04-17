@@ -1518,6 +1518,7 @@ class IntegrationTests(unittest.TestCase):
         with self._new_swd():
             self.assertEqual(EXIT_RENEWAL, self._run(args))
             initial_stats = self.get_stats(*files)
+            unchangeable_stats = self.get_stats(*files[:2])
 
             self.assertEqual(EXIT_NO_RENEWAL, self._run(args))
             # No renewal => no files should be touched
@@ -1533,6 +1534,8 @@ class IntegrationTests(unittest.TestCase):
             # Changing SANs should trigger "renewal"
             self.assertEqual(
                 EXIT_RENEWAL, self._run('%s -d le2.wtf:%s' % (args, webroot)))
+            # but it shouldn't unnecessarily overwrite the key (#67)
+            self.assertEqual(unchangeable_stats, self.get_stats(*files[:2]))
 
 
 if __name__ == '__main__':
