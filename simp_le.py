@@ -1011,13 +1011,17 @@ def componentwise_or(first, second):
     return tuple(x or y for x, y in zip(first, second))
 
 
-def persist_data(args, data):
+def persist_data(args, existing_data, new_data):
     """Persist data on disk.
 
     Uses all selected plugins to save certificate data to disk.
     """
     for plugin_name in args.ioplugins:
-        IOPlugin.registered[plugin_name].save(data)
+        plugin = IOPlugin.registered[plugin_name]
+        if any(persisted and existing != new
+               for persisted, existing, new in
+               zip(plugin.persisted(), existing_data, new_data)):
+            plugin.save(new_data)
 
 
 def asn1_generalizedtime_to_dt(timestamp):
@@ -1270,12 +1274,12 @@ def get_certr(client, csr, authorizations):
     return certr
 
 
-def new_data(args, existing):
+def persist_new_data(args, existing_data):
     """Issue and persist new key/cert/chain."""
     roots = compute_roots(args.vhosts, args.default_root)
     logger.debug('Computed roots: %r', roots)
 
-    client = registered_client(args, existing.account_key)
+    client = registered_client(args, existing_data.account_key)
 
     authorizations = dict(
         (vhost.name, client.request_domain_challenges(
@@ -1302,29 +1306,29 @@ def new_data(args, existing):
 
         client.answer_challenge(challb, response)
 
-    if args.reuse_key and existing.key is not None:
+    if args.reuse_key and existing_data.key is not None:
         logger.info('Reusing existing certificate private key')
-        key = existing.key
+        key = existing_data.key
     else:
         logger.info('Generating new certificate private key')
         key = ComparablePKey(gen_pkey(args.cert_key_size))
     csr = gen_csr(key.wrapped, [vhost.name.encode() for vhost in args.vhosts])
     certr = get_certr(client, csr, authorizations)
-    persist_data(args, IOPlugin.Data(
+    persist_data(args, existing_data, new_data=IOPlugin.Data(
         account_key=client.key, key=key,
         cert=certr.body, chain=client.fetch_chain(certr)))
 
 
 def revoke(args):
     """Revoke certificate."""
-    existing = load_existing_data(args.ioplugins)
-    if existing.cert is None:
+    existing_data = load_existing_data(args.ioplugins)
+    if existing_data.cert is None:
         raise Error('No existing certificate')
 
-    key = check_or_generate_account_key(args, existing.account_key)
+    key = check_or_generate_account_key(args, existing_data.account_key)
     net = acme_client.ClientNetwork(key, user_agent=args.user_agent)
     client = acme_client.Client(directory=args.server, key=key, net=net)
-    client.revoke(existing.cert)
+    client.revoke(existing_data.cert)
     return EXIT_REVOKE_OK
 
 
@@ -1379,7 +1383,7 @@ def main_with_exceptions(cli_args):
                     'necessary, exiting with status code %d.', EXIT_NO_RENEWAL)
         return EXIT_NO_RENEWAL
     else:
-        new_data(args, existing_data)
+        persist_new_data(args, existing_data)
         return EXIT_RENEWAL
 
 
