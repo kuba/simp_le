@@ -1347,6 +1347,12 @@ class IntegrationTests(unittest.TestCase):
             return stats
         return dict((path, _single_path_stats(path)) for path in paths)
 
+    @classmethod
+    def _save_csr(cls, *names):
+        return IOPlugin.registered['csr.pem'].save(
+            IOPlugin.EMPTY_DATA._replace(csr=jose.ComparableX509(
+                gen_csr(gen_pkey(cls.BOULDER_MIN_BITS), names))))
+
     def test_it(self):
         webroot = os.path.join(
             os.getcwd(), 'public_html', '.well-known', 'acme-challenge')
@@ -1356,10 +1362,7 @@ class IntegrationTests(unittest.TestCase):
         files = ('account_key.json', 'csr.pem', 'fullchain.pem')
 
         with self._new_swd():
-            IOPlugin.registered['csr.pem'].save(IOPlugin.EMPTY_DATA._replace(
-                csr=jose.ComparableX509(
-                    gen_csr(gen_pkey(self.BOULDER_MIN_BITS), [b'le.wtf']))))
-
+            self._save_csr(b'le.wtf')
             self.assertEqual(EXIT_RENEWAL, self._run(args))
             initial_stats = self.get_stats(*files)
 
@@ -1375,8 +1378,8 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(initial_stats, self.get_stats(*files))
 
             # Changing SANs should trigger "renewal"
-            self.assertEqual(
-                EXIT_RENEWAL, self._run('%s %s' % (args, webroot)))
+            self._save_csr(b'le.wtf', b'le2.wtf')
+            self.assertEqual(EXIT_RENEWAL, self._run(args))
 
 
 if __name__ == '__main__':
