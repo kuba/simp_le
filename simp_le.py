@@ -1492,7 +1492,19 @@ class IntegrationTests(unittest.TestCase):
 
     @classmethod
     def get_stats(cls, *paths):
-        return dict((path, os.stat(path)) for path in paths)
+        def _single_path_stats(path):
+            all = os.stat(path)
+            stats = dict(
+                (name[3:], getattr(all, name))
+                for name in dir(all)
+                # skip access (read) time
+                if name.startswith('st_') and name != 'st_atime')
+            # st_*time has a second-granularity so it can't be
+            # reliably used to prove that contents have changed or not
+            with open(path, 'rb') as f:
+                stats.update(checksum=hashlib.sha256(f.read()).hexdigest())
+            return stats
+        return dict((path, _single_path_stats(path)) for path in paths)
 
     def test_it(self):
         webroot = os.path.join(os.getcwd(), 'public_html')
