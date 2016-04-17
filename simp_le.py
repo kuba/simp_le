@@ -1203,14 +1203,15 @@ def main_with_exceptions(cli_args):
     elif args.version:  # --version
         sys.stdout.write('%s %s\n' % (os.path.basename(sys.argv[0]), VERSION))
         return EXIT_HELP_VERSION_OK
-    elif args.root is None:
-        raise Error('Webroot argument is required')
 
     setup_logging(args.verbose)
     logger.debug('%r parsed as %r', cli_args, args)
 
     if args.revoke:  # --revoke
         return revoke(args)
+
+    if args.root is None:
+        raise Error('Webroot argument is required')
 
     check_plugins_persist_all(args.ioplugins)
 
