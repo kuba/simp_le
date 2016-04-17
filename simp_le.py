@@ -1493,14 +1493,14 @@ class IntegrationTests(unittest.TestCase):
     @classmethod
     def get_stats(cls, *paths):
         def _single_path_stats(path):
-            all = os.stat(path)
+            all_stats = os.stat(path)
             stats = dict(
-                (name[3:], getattr(all, name)) for name in dir(all)
+                (name[3:], getattr(all_stats, name)) for name in dir(all_stats)
                 # skip access (read) time, includes _ns.
                 if name.startswith('st_') and name.startswith('st_atime'))
             # st_*time has a second-granularity so it can't be
             # reliably used to prove that contents have changed or not
-            with open(path, 'rb') as f:
+            with open(path, 'rb') as f:  # pylint: disable=invalid-name
                 stats.update(checksum=hashlib.sha256(f.read()).hexdigest())
             return stats
         return dict((path, _single_path_stats(path)) for path in paths)
