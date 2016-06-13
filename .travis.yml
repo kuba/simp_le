@@ -32,6 +32,7 @@ addons:
 env:
   global:
     - GOPATH=/tmp/go
+    - GO15VENDOREXPERIMENT=1  # Fixes problems with vendor directories
     - PATH=$GOPATH/bin:$PATH
   # delegate tests to tox; build matrix contains one suite per testenv
   matrix:
